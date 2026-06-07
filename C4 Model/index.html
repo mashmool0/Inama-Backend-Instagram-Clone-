@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inama — C4 Level 1: System Context</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 24px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #f8fafc;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-top: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ── Diagram canvas ── */
+    .diagram {
+      position: relative;
+      width: 900px;
+      max-width: 100%;
+    }
+
+    /* ── SVG arrows layer ── */
+    .arrows-layer {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* ── Rows ── */
+    .row {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .row-actors-top   { margin-bottom: 48px; }
+    .row-system       { margin-bottom: 48px; }
+    .row-externals    { }
+
+    /* ── Base card ── */
+    .card {
+      border-radius: 10px;
+      padding: 20px 24px;
+      text-align: center;
+      position: relative;
+      min-width: 140px;
+      max-width: 160px;
+    }
+
+    .card-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+      opacity: 0.75;
+    }
+
+    .card-name {
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: 6px;
+    }
+
+    .card-desc {
+      font-size: 0.72rem;
+      line-height: 1.5;
+      opacity: 0.8;
+    }
+
+    /* ── Actor (person) ── */
+    .actor {
+      background: #1e293b;
+      border: 2px solid #334155;
+      color: #cbd5e1;
+    }
+
+    .actor .card-label { color: #94a3b8; }
+    .actor .card-name  { color: #f1f5f9; }
+
+    .actor-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      margin: 0 auto 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .actor.user   .actor-icon { background: #1d4ed8; }
+    .actor.admin  .actor-icon { background: #7c3aed; }
+
+    /* ── Core system ── */
+    .system-core {
+      background: #1e3a5f;
+      border: 2px solid #2563eb;
+      color: #bfdbfe;
+      min-width: 260px;
+      max-width: 280px;
+      padding: 28px 32px;
+    }
+
+    .system-core .card-label { color: #93c5fd; }
+    .system-core .card-name  { font-size: 1.5rem; color: #eff6ff; }
+    .system-core .card-desc  { color: #bfdbfe; font-size: 0.78rem; }
+
+    .system-badge {
+      display: inline-block;
+      background: #2563eb;
+      color: #eff6ff;
+      font-size: 0.6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+    }
+
+    /* ── External system ── */
+    .external {
+      background: #1a1f2e;
+      border: 2px dashed #475569;
+      color: #94a3b8;
+      min-width: 140px;
+      max-width: 155px;
+    }
+
+    .external .card-label { color: #64748b; }
+    .external .card-name  { color: #e2e8f0; font-size: 0.9rem; }
+
+    .ext-icon {
+      font-size: 1.5rem;
+      margin-bottom: 8px;
+    }
+
+    /* ── Relationship label on arrow ── */
+    .rel-label {
+      font-size: 0.65rem;
+      color: #475569;
+      font-style: italic;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex;
+      gap: 32px;
+      margin-top: 56px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+
+    .legend-box {
+      width: 28px;
+      height: 18px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .legend-box.actor-box    { background: #1e293b; border: 2px solid #334155; }
+    .legend-box.system-box   { background: #1e3a5f; border: 2px solid #2563eb; }
+    .legend-box.external-box { background: #1a1f2e; border: 2px dashed #475569; }
+
+    /* ── Footer note ── */
+    .footer-note {
+      margin-top: 40px;
+      font-size: 0.72rem;
+      color: #334155;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Inama</h1>
+    <p>C4 Model — Level 1 · System Context Diagram</p>
+  </header>
+
+  <div class="diagram" id="diagram">
+
+    <!-- SVG arrows -->
+    <svg class="arrows-layer" id="arrowsSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+
+    <!-- Row 1: Actors -->
+    <div class="row row-actors-top">
+
+      <div class="card actor user" id="actor-user">
+        <div class="actor-icon">👤</div>
+        <div class="card-label">Person</div>
+        <div class="card-name">User</div>
+        <div class="card-desc">Browses feed, posts photos, follows other users</div>
+      </div>
+
+      <div class="card actor admin" id="actor-admin">
+        <div class="actor-icon">🛡</div>
+        <div class="card-label">Person</div>
+        <div class="card-name">Admin</div>
+        <div class="card-desc">Manages content, users, and platform settings</div>
+      </div>
+
+    </div>
+
+    <!-- Row 2: Core system -->
+    <div class="row row-system">
+      <div class="card system-core" id="system-inama">
+        <div class="system-badge">Software System</div>
+        <div class="card-name">Inama</div>
+        <div class="card-desc">
+          Instagram-like social platform.<br/>
+          Handles auth, profiles, posts, interactions, and notifications.
+          Targets 10,000 concurrent users.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: External systems -->
+    <div class="row row-externals">
+
+      <div class="card external" id="ext-sms">
+        <div class="ext-icon">📱</div>
+        <div class="card-label">External System</div>
+        <div class="card-name">SMS Provider</div>
+        <div class="card-desc">Delivers OTP codes for phone verification</div>
+      </div>
+
+      <div class="card external" id="ext-email">
+        <div class="ext-icon">✉️</div>
+        <div class="card-label">External System</div>
+        <div class="card-name">Email Provider</div>
+        <div class="card-desc">Sends password reset and transactional emails</div>
+      </div>
+
+      <div class="card external" id="ext-storage">
+        <div class="ext-icon">🗄</div>
+        <div class="card-label">External System</div>
+        <div class="card-name">Object Storage</div>
+        <div class="card-desc">Stores original and resized post photos (S3 / Liara)</div>
+      </div>
+
+      <div class="card external" id="ext-push">
+        <div class="ext-icon">🔔</div>
+        <div class="card-label">External System</div>
+        <div class="card-name">Push Notification</div>
+        <div class="card-desc">Delivers async like, comment, and follow alerts (FCM / APNs)</div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-box actor-box"></div>
+      Person (actor)
+    </div>
+    <div class="legend-item">
+      <div class="legend-box system-box"></div>
+      Software system (in scope)
+    </div>
+    <div class="legend-item">
+      <div class="legend-box external-box"></div>
+      External system (out of scope)
+    </div>
+  </div>
+
+  <div class="footer-note">
+    Dashed borders = external systems owned and operated outside Inama
+  </div>
+
+  <script>
+    // Draw arrows between cards after layout is stable
+    function getCenter(el, ref) {
+      const er = el.getBoundingClientRect();
+      const rr = ref.getBoundingClientRect();
+      return {
+        x: er.left - rr.left + er.width / 2,
+        y: er.top  - rr.top  + er.height / 2,
+        top:    er.top    - rr.top,
+        bottom: er.bottom - rr.top,
+        left:   er.left   - rr.left,
+        right:  er.right  - rr.left,
+      };
+    }
+
+    function arrow(svg, x1, y1, x2, y2, label, color = '#334155') {
+      const mid = { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+      line.setAttribute('stroke', color);
+      line.setAttribute('stroke-width', '1.5');
+      line.setAttribute('marker-end', `url(#arrowhead-${color.replace('#','')})`);
+      svg.appendChild(line);
+
+      if (label) {
+        const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        txt.setAttribute('x', mid.x); txt.setAttribute('y', mid.y);
+        txt.setAttribute('class', 'rel-label');
+        txt.setAttribute('fill', '#64748b');
+        txt.textContent = label;
+        svg.appendChild(bg);
+        svg.appendChild(txt);
+      }
+    }
+
+    function addMarker(svg, color) {
+      const id = `arrowhead-${color.replace('#','')}`;
+      if (svg.querySelector(`#${id}`)) return;
+      const defs = svg.querySelector('defs') || svg.appendChild(document.createElementNS('http://www.w3.org/2000/svg','defs'));
+      defs.innerHTML += `
+        <marker id="${id}" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="${color}" />
+        </marker>`;
+    }
+
+    function drawArrows() {
+      const diagram = document.getElementById('diagram');
+      const svg     = document.getElementById('arrowsSvg');
+      svg.innerHTML = '<defs></defs>';
+      svg.setAttribute('width',  diagram.offsetWidth);
+      svg.setAttribute('height', diagram.offsetHeight);
+
+      const actorColor    = '#3b82f6';
+      const externalColor = '#475569';
+
+      addMarker(svg, actorColor);
+      addMarker(svg, externalColor);
+
+      const inama   = getCenter(document.getElementById('system-inama'),   diagram);
+      const user    = getCenter(document.getElementById('actor-user'),      diagram);
+      const admin   = getCenter(document.getElementById('actor-admin'),     diagram);
+      const sms     = getCenter(document.getElementById('ext-sms'),         diagram);
+      const email   = getCenter(document.getElementById('ext-email'),       diagram);
+      const storage = getCenter(document.getElementById('ext-storage'),     diagram);
+      const push    = getCenter(document.getElementById('ext-push'),        diagram);
+
+      // Actor → System
+      arrow(svg, user.x,  user.bottom,  inama.x - 40, inama.top, 'uses', actorColor);
+      arrow(svg, admin.x, admin.bottom, inama.x + 40, inama.top, 'uses', actorColor);
+
+      // System → External
+      arrow(svg, inama.x - 100, inama.bottom, sms.x,     sms.top,     'sends OTP via',      externalColor);
+      arrow(svg, inama.x - 30,  inama.bottom, email.x,   email.top,   'sends email via',    externalColor);
+      arrow(svg, inama.x + 30,  inama.bottom, storage.x, storage.top, 'stores photos',      externalColor);
+      arrow(svg, inama.x + 100, inama.bottom, push.x,    push.top,    'pushes notifs async',externalColor);
+    }
+
+    window.addEventListener('load', drawArrows);
+    window.addEventListener('resize', drawArrows);
+  </script>
+
+</body>
+</html>

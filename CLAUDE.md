@@ -26,7 +26,7 @@
 
 **Phase 0 — Foundation** (not started)
 Mono-repo scaffold → Docker Compose → CI/CD → shared proto → one working gRPC call end-to-end.
-Full phase plan: [docs/](docs/)
+Full phase-by-phase plan (two devs, parallel): [docs/09-roadmap.md](docs/09-roadmap.md)
 
 ## Guardrails — Check These Before Every Action
 
@@ -64,5 +64,6 @@ No handler touches a DB directly. No service calls another service's repository.
 | Mono-repo layout + CI/CD | [docs/06-infrastructure.md](docs/06-infrastructure.md) |
 | Monitoring stack | [docs/07-monitoring.md](docs/07-monitoring.md) |
 | Load test targets + tools | [docs/08-load-testing.md](docs/08-load-testing.md) |
+| Phase plan + who builds what | [docs/09-roadmap.md](docs/09-roadmap.md) |
 
 Read the relevant doc before answering architecture questions — do not answer from memory alone.

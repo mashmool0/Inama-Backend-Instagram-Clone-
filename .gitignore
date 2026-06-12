@@ -141,3 +141,4 @@ todo.txt
 *.bak
 *.orig
 .claude 
+claude_should*

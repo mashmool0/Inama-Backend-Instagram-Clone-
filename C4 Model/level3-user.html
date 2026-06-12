@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inama — L3: User / Social Graph</title>
+  <link rel="stylesheet" href="level3.css" />
+</head>
+<body>
+  <div class="nav">
+    <a href="level3-index.html">← L3 Index</a>
+    <a href="level3-auth.html">← Auth</a>
+    <a href="level3-posts.html">Posts →</a>
+  </div>
+  <header>
+    <h1>User / Social Graph Service</h1>
+    <p>C4 Level 3 · Component Diagram</p>
+    <div class="subtitle">Go · Profile CRUD, follow/unfollow — hot path for feed fanout</div>
+  </header>
+
+  <div class="diagram" id="diagram">
+    <svg id="svg-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+
+    <div class="container-boundary">
+      <div class="container-boundary-label">User / Social Graph Service</div>
+      <div class="container-boundary-tech">[Go · gRPC]</div>
+
+      <div class="row">
+        <div class="card comp-entry" id="grpc-server">
+          <div class="card-type">Component · Entry</div>
+          <div class="card-name">gRPC Server</div>
+          <div class="card-desc">Exposes User service proto.<br/>Called by Gateway and Feed fanout worker.</div>
+        </div>
+      </div>
+
+      <div class="section-label">Handlers</div>
+      <div class="row">
+        <div class="card comp-handler" id="h-profile">
+          <div class="card-type">Component · Handler</div>
+          <div class="card-name">Profile Handler</div>
+          <div class="card-desc">GetProfile, UpdateProfile,<br/>GetMyProfile</div>
+        </div>
+        <div class="card comp-handler" id="h-follow">
+          <div class="card-type">Component · Handler</div>
+          <div class="card-name">Follow Handler</div>
+          <div class="card-desc">Follow, Unfollow,<br/>GetFollowers, GetFollowing</div>
+        </div>
+      </div>
+
+      <div class="section-label">Business Logic</div>
+      <div class="row">
+        <div class="card comp-service" id="profile-svc">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">Profile Service</div>
+          <div class="card-desc">Validate + apply profile updates.<br/>Username uniqueness check.</div>
+        </div>
+        <div class="card comp-service" id="follow-svc">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">Follow Service</div>
+          <div class="card-desc">Follow/unfollow logic.<br/>Duplicate follow guard.<br/>Counter updates (follower_count).</div>
+        </div>
+      </div>
+
+      <div class="section-label">Data Access</div>
+      <div class="row">
+        <div class="card comp-repo" id="user-repo">
+          <div class="card-type">Component · Repository</div>
+          <div class="card-name">User Repository</div>
+          <div class="card-desc">CRUD on users table.<br/>Lookup by id or username.</div>
+        </div>
+        <div class="card comp-repo" id="follow-repo">
+          <div class="card-type">Component · Repository</div>
+          <div class="card-name">Follow Repository</div>
+          <div class="card-desc">INSERT/DELETE follows.<br/>GetFollowers(user_id) — critical for fanout.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row row-external-bottom">
+      <div class="ext-db" id="user-db">
+        <div class="card-type">Database</div>
+        <div class="card-name">user_db</div>
+        <div class="card-tech">[PostgreSQL]</div>
+      </div>
+    </div>
+    <div class="row row-external-bottom" style="margin-top:12px;">
+      <div class="ext-service" id="feed-caller">
+        <div class="card-type">Caller (fanout)</div>
+        <div class="card-name">Feed Fanout Worker</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-box leg-entry"></div>Entry</div>
+    <div class="legend-item"><div class="legend-box leg-handler"></div>Handler</div>
+    <div class="legend-item"><div class="legend-box leg-service"></div>Service</div>
+    <div class="legend-item"><div class="legend-box leg-repo"></div>Repository</div>
+  </div>
+
+  <script src="arrows.js"></script>
+  <script>
+    window.addEventListener('load', () => {
+      const d = document.getElementById('diagram');
+      const svg = document.getElementById('svg-layer');
+      initSvg(svg, d);
+      const B = '#3b82f6', P = '#7c3aed', G = '#475569';
+
+      arrow(svg,d,'grpc-server','bottom','h-profile','top', B,false,'');
+      arrow(svg,d,'grpc-server','bottom','h-follow','top',  B,false,'');
+
+      arrow(svg,d,'h-profile','bottom','profile-svc','top', P,false,'');
+      arrow(svg,d,'h-follow','bottom','follow-svc','top',   P,false,'');
+
+      arrow(svg,d,'profile-svc','bottom','user-repo','top',   G,false,'');
+      arrow(svg,d,'follow-svc','bottom','follow-repo','top',  G,false,'');
+      arrow(svg,d,'follow-svc','bottom','user-repo','top',    G,false,'update counters');
+
+      arrow(svg,d,'user-repo','bottom','user-db','top',   G,false,'SQL');
+      arrow(svg,d,'follow-repo','bottom','user-db','top', G,false,'SQL');
+
+      arrow(svg,d,'feed-caller','top','grpc-server','bottom', '#f59e0b',true,'GetFollowers');
+    });
+    window.addEventListener('resize', () => location.reload());
+  </script>
+</body>
+</html>

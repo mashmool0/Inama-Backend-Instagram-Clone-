@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inama — L3: Posts + Interactions</title>
+  <link rel="stylesheet" href="level3.css" />
+</head>
+<body>
+  <div class="nav">
+    <a href="level3-index.html">← L3 Index</a>
+    <a href="level3-user.html">← User</a>
+    <a href="level3-feed.html">Feed →</a>
+  </div>
+  <header>
+    <h1>Posts + Interactions Service</h1>
+    <p>C4 Level 3 · Component Diagram</p>
+    <div class="subtitle">Go · Core content write path · Outbox pattern for event publishing</div>
+  </header>
+
+  <div class="diagram" id="diagram">
+    <svg id="svg-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+
+    <div class="container-boundary">
+      <div class="container-boundary-label">Posts + Interactions Service</div>
+      <div class="container-boundary-tech">[Go · gRPC]</div>
+
+      <div class="row">
+        <div class="card comp-entry" id="grpc-server">
+          <div class="card-type">Component · Entry</div>
+          <div class="card-name">gRPC Server</div>
+          <div class="card-desc">Handles all sync requests from gateway.</div>
+        </div>
+      </div>
+
+      <div class="section-label">Handlers</div>
+      <div class="row">
+        <div class="card comp-handler" id="h-post">
+          <div class="card-type">Component · Handler</div>
+          <div class="card-name">Post Handler</div>
+          <div class="card-desc">CreatePost, DeletePost, GetPost</div>
+        </div>
+        <div class="card comp-handler" id="h-like">
+          <div class="card-type">Component · Handler</div>
+          <div class="card-name">Like Handler</div>
+          <div class="card-desc">LikePost, UnlikePost</div>
+        </div>
+        <div class="card comp-handler" id="h-comment">
+          <div class="card-type">Component · Handler</div>
+          <div class="card-name">Comment Handler</div>
+          <div class="card-desc">AddComment, GetComments</div>
+        </div>
+      </div>
+
+      <div class="section-label">Business Logic</div>
+      <div class="row">
+        <div class="card comp-service" id="post-svc">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">Post Service</div>
+          <div class="card-desc">Validates, creates post, uploads media to S3.<br/>On create: writes Outbox event atomically.</div>
+        </div>
+        <div class="card comp-service" id="like-svc">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">Like Service</div>
+          <div class="card-desc">Idempotent like/unlike.<br/>Atomic counter: UPDATE posts SET like_count = like_count + 1</div>
+        </div>
+        <div class="card comp-service" id="comment-svc">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">Comment Service</div>
+          <div class="card-desc">Insert comment, atomic comment_count update.</div>
+        </div>
+      </div>
+
+      <div class="section-label">Data Access</div>
+      <div class="row">
+        <div class="card comp-repo" id="post-repo">
+          <div class="card-type">Component · Repository</div>
+          <div class="card-name">Post Repository</div>
+          <div class="card-desc">posts table CRUD.</div>
+        </div>
+        <div class="card comp-repo" id="like-repo">
+          <div class="card-type">Component · Repository</div>
+          <div class="card-name">Like Repository</div>
+          <div class="card-desc">likes table.<br/>Upsert / delete.</div>
+        </div>
+        <div class="card comp-repo" id="comment-repo">
+          <div class="card-type">Component · Repository</div>
+          <div class="card-name">Comment Repository</div>
+          <div class="card-desc">comments table CRUD.</div>
+        </div>
+        <div class="card comp-repo" id="outbox-repo">
+          <div class="card-type">Component · Repository</div>
+          <div class="card-name">Outbox Repository</div>
+          <div class="card-desc">Write event in same TX as post insert.<br/>Guarantees no lost events.</div>
+        </div>
+      </div>
+
+      <div class="section-label">Async — Outbox Worker</div>
+      <div class="row">
+        <div class="card comp-worker" id="outbox-worker">
+          <div class="card-type">Component · Worker (goroutine)</div>
+          <div class="card-name">Outbox Worker</div>
+          <div class="card-desc">Polls outbox table every second.<br/>Publishes unpublished events to queue.<br/>Marks as published on ack.</div>
+        </div>
+        <div class="card comp-client" id="s3-client">
+          <div class="card-type">Component · Client</div>
+          <div class="card-name">S3 Client</div>
+          <div class="card-desc">Uploads post media to S3 / Liara object storage.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row row-external-bottom">
+      <div class="ext-db" id="posts-db">
+        <div class="card-type">Database</div>
+        <div class="card-name">posts_db</div>
+        <div class="card-tech">[PostgreSQL]</div>
+      </div>
+      <div class="ext-queue" id="queue">
+        <div class="card-type">Message Broker</div>
+        <div class="card-name">Message Queue</div>
+      </div>
+      <div class="ext-third" id="s3">
+        <div class="card-type">External</div>
+        <div class="card-name">S3 / Liara</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-box leg-entry"></div>Entry</div>
+    <div class="legend-item"><div class="legend-box leg-handler"></div>Handler</div>
+    <div class="legend-item"><div class="legend-box leg-service"></div>Service</div>
+    <div class="legend-item"><div class="legend-box leg-repo"></div>Repository</div>
+    <div class="legend-item"><div class="legend-box leg-worker"></div>Async worker</div>
+    <div class="legend-item"><div class="legend-box leg-client"></div>Client</div>
+  </div>
+
+  <script src="arrows.js"></script>
+  <script>
+    window.addEventListener('load', () => {
+      const d   = document.getElementById('diagram');
+      const svg = document.getElementById('svg-layer');
+      initSvg(svg, d);
+      const B = '#3b82f6', P = '#7c3aed', G = '#475569', O = '#f59e0b';
+
+      arrow(svg,d,'grpc-server','bottom','h-post','top',    B,false,'');
+      arrow(svg,d,'grpc-server','bottom','h-like','top',    B,false,'');
+      arrow(svg,d,'grpc-server','bottom','h-comment','top', B,false,'');
+
+      arrow(svg,d,'h-post','bottom','post-svc','top',       P,false,'');
+      arrow(svg,d,'h-like','bottom','like-svc','top',       P,false,'');
+      arrow(svg,d,'h-comment','bottom','comment-svc','top', P,false,'');
+
+      arrow(svg,d,'post-svc','bottom','post-repo','top',    G,false,'');
+      arrow(svg,d,'post-svc','bottom','outbox-repo','top',  G,false,'same TX');
+      arrow(svg,d,'post-svc','bottom','s3-client','top',    G,false,'upload');
+      arrow(svg,d,'like-svc','bottom','like-repo','top',    G,false,'atomic +1');
+      arrow(svg,d,'comment-svc','bottom','comment-repo','top', G,false,'');
+
+      arrow(svg,d,'post-repo','bottom','posts-db','top',    G,false,'SQL');
+      arrow(svg,d,'like-repo','bottom','posts-db','top',    G,false,'SQL');
+      arrow(svg,d,'comment-repo','bottom','posts-db','top', G,false,'SQL');
+      arrow(svg,d,'outbox-repo','bottom','posts-db','top',  G,false,'outbox table');
+
+      arrow(svg,d,'outbox-worker','left','outbox-repo','right', O,false,'poll');
+      arrow(svg,d,'outbox-worker','bottom','queue','top',     O,true,'post.created / liked');
+
+      arrow(svg,d,'s3-client','bottom','s3','top', G,false,'PUT object');
+    });
+    window.addEventListener('resize', () => location.reload());
+  </script>
+</body>
+</html>

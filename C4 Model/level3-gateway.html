@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inama — L3: API Gateway</title>
+  <link rel="stylesheet" href="level3.css" />
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">L1</a>
+    <a href="level2.html">L2</a>
+    <a href="level3-index.html">L3 Index</a>
+    <a href="level3-auth.html">Auth →</a>
+  </div>
+
+  <header>
+    <h1>API Gateway</h1>
+    <p>C4 Level 3 · Component Diagram</p>
+    <div class="subtitle">Go · Every request passes through this container</div>
+  </header>
+
+  <div class="diagram" id="diagram">
+    <svg id="svg-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+
+    <!-- Top: incoming clients -->
+    <div class="row row-external">
+      <div class="ext-third" id="client-web">
+        <div class="card-type">Person</div>
+        <div class="card-name">Web / Mobile</div>
+      </div>
+    </div>
+
+    <div class="container-boundary">
+      <div class="container-boundary-label">API Gateway</div>
+      <div class="container-boundary-tech">[Go]</div>
+
+      <!-- Entry -->
+      <div class="row">
+        <div class="card comp-entry" id="http-server">
+          <div class="card-type">Component · Entry</div>
+          <div class="card-name">HTTP Server</div>
+          <div class="card-desc">Listens on :8080.<br/>Accepts all inbound HTTPS requests.</div>
+        </div>
+      </div>
+
+      <!-- Middleware chain -->
+      <div class="section-label">Middleware Chain</div>
+      <div class="row">
+        <div class="card comp-service" id="ratelimit">
+          <div class="card-type">Component · Middleware</div>
+          <div class="card-name">Rate Limiter</div>
+          <div class="card-desc">Sliding window counter per IP.<br/>Rejects if limit exceeded (429).</div>
+        </div>
+        <div class="card comp-service" id="jwt-mw">
+          <div class="card-type">Component · Middleware</div>
+          <div class="card-name">JWT Middleware</div>
+          <div class="card-desc">Validates Bearer token.<br/>Injects user_id into context.<br/>Rejects invalid tokens (401).</div>
+        </div>
+      </div>
+
+      <!-- Router -->
+      <div class="row">
+        <div class="card comp-handler" id="router">
+          <div class="card-type">Component · Router</div>
+          <div class="card-name">Request Router</div>
+          <div class="card-desc">Maps HTTP path + method<br/>to the correct gRPC client.</div>
+        </div>
+      </div>
+
+      <!-- gRPC clients -->
+      <div class="section-label">gRPC Clients — one per downstream service</div>
+      <div class="row">
+        <div class="card comp-client" id="cli-auth">
+          <div class="card-type">Component · gRPC Client</div>
+          <div class="card-name">Auth Client</div>
+        </div>
+        <div class="card comp-client" id="cli-user">
+          <div class="card-type">Component · gRPC Client</div>
+          <div class="card-name">User Client</div>
+        </div>
+        <div class="card comp-client" id="cli-posts">
+          <div class="card-type">Component · gRPC Client</div>
+          <div class="card-name">Posts Client</div>
+        </div>
+        <div class="card comp-client" id="cli-feed">
+          <div class="card-type">Component · gRPC Client</div>
+          <div class="card-name">Feed Client</div>
+        </div>
+        <div class="card comp-client" id="cli-notif">
+          <div class="card-type">Component · gRPC Client</div>
+          <div class="card-name">Notif Client</div>
+        </div>
+        <div class="card comp-client" id="cli-search">
+          <div class="card-type">Component · gRPC Client</div>
+          <div class="card-name">Search Client</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- External: Redis + downstream services -->
+    <div class="row row-external-bottom">
+      <div class="ext-redis" id="redis">
+        <div class="card-type">External · Cache</div>
+        <div class="card-name">Redis</div>
+      </div>
+    </div>
+    <div class="row row-external-bottom">
+      <div class="ext-service" id="svc-auth"><div class="card-type">Service</div><div class="card-name">Auth</div></div>
+      <div class="ext-service" id="svc-user"><div class="card-type">Service</div><div class="card-name">User</div></div>
+      <div class="ext-service" id="svc-posts"><div class="card-type">Service</div><div class="card-name">Posts</div></div>
+      <div class="ext-service" id="svc-feed"><div class="card-type">Service</div><div class="card-name">Feed</div></div>
+      <div class="ext-service" id="svc-notif"><div class="card-type">Service</div><div class="card-name">Notif</div></div>
+      <div class="ext-service" id="svc-search"><div class="card-type">Service</div><div class="card-name">Search</div></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-box leg-entry"></div>Entry point</div>
+    <div class="legend-item"><div class="legend-box leg-service"></div>Middleware / logic</div>
+    <div class="legend-item"><div class="legend-box leg-handler"></div>Router</div>
+    <div class="legend-item"><div class="legend-box leg-client"></div>gRPC client</div>
+  </div>
+
+  <script src="arrows.js"></script>
+  <script>
+    window.addEventListener('load', () => {
+      const d = document.getElementById('diagram');
+      const svg = document.getElementById('svg-layer');
+      initSvg(svg, d);
+
+      arrow(svg, d, 'client-web',  'bottom', 'http-server', 'top',    '#94a3b8', false, 'HTTPS');
+      arrow(svg, d, 'http-server', 'bottom', 'ratelimit',   'top',    '#3b82f6', false, '');
+      arrow(svg, d, 'http-server', 'bottom', 'jwt-mw',      'top',    '#3b82f6', false, '');
+      arrow(svg, d, 'ratelimit',   'right',  'redis',       'top',    '#ef4444', false, 'counter');
+      arrow(svg, d, 'ratelimit',   'bottom', 'router',      'top',    '#3b82f6', false, '');
+      arrow(svg, d, 'jwt-mw',      'bottom', 'router',      'top',    '#3b82f6', false, '');
+      arrow(svg, d, 'router',      'bottom', 'cli-auth',    'top',    '#7c3aed', false, '');
+      arrow(svg, d, 'router',      'bottom', 'cli-user',    'top',    '#7c3aed', false, '');
+      arrow(svg, d, 'router',      'bottom', 'cli-posts',   'top',    '#7c3aed', false, '');
+      arrow(svg, d, 'router',      'bottom', 'cli-feed',    'top',    '#7c3aed', false, '');
+      arrow(svg, d, 'router',      'bottom', 'cli-notif',   'top',    '#7c3aed', false, '');
+      arrow(svg, d, 'router',      'bottom', 'cli-search',  'top',    '#7c3aed', false, '');
+      arrow(svg, d, 'cli-auth',    'bottom', 'svc-auth',    'top',    '#475569', false, 'gRPC');
+      arrow(svg, d, 'cli-user',    'bottom', 'svc-user',    'top',    '#475569', false, 'gRPC');
+      arrow(svg, d, 'cli-posts',   'bottom', 'svc-posts',   'top',    '#475569', false, 'gRPC');
+      arrow(svg, d, 'cli-feed',    'bottom', 'svc-feed',    'top',    '#475569', false, 'gRPC');
+      arrow(svg, d, 'cli-notif',   'bottom', 'svc-notif',   'top',    '#475569', false, 'gRPC');
+      arrow(svg, d, 'cli-search',  'bottom', 'svc-search',  'top',    '#475569', false, 'gRPC');
+    });
+    window.addEventListener('resize', () => location.reload());
+  </script>
+</body>
+</html>

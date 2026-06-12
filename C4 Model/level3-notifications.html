@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inama — L3: Notifications</title>
+  <link rel="stylesheet" href="level3.css" />
+</head>
+<body>
+  <div class="nav">
+    <a href="level3-index.html">← L3 Index</a>
+    <a href="level3-feed.html">← Feed</a>
+    <a href="level3-search.html">Search →</a>
+  </div>
+  <header>
+    <h1>Notifications Service</h1>
+    <p>C4 Level 3 · Component Diagram</p>
+    <div class="subtitle">Go · Async queue consumer — no user waits for this path</div>
+  </header>
+
+  <div class="diagram" id="diagram">
+    <svg id="svg-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+
+    <div class="row">
+      <div class="ext-queue" id="queue-in">
+        <div class="card-type">Message Broker</div>
+        <div class="card-name">Message Queue</div>
+      </div>
+      <div class="ext-service" id="gateway-caller">
+        <div class="card-type">Caller (sync)</div>
+        <div class="card-name">API Gateway</div>
+      </div>
+    </div>
+
+    <div class="container-boundary">
+      <div class="container-boundary-label">Notifications Service</div>
+      <div class="container-boundary-tech">[Go]</div>
+
+      <div class="row">
+        <div class="card comp-worker" id="queue-consumer">
+          <div class="card-type">Component · Queue Consumer</div>
+          <div class="card-name">Event Consumer</div>
+          <div class="card-desc">Consumes: post.liked, comment.created, user.followed.<br/>Acks only after delivery attempt.</div>
+        </div>
+        <div class="card comp-entry" id="grpc-server">
+          <div class="card-type">Component · Entry</div>
+          <div class="card-name">gRPC Server</div>
+          <div class="card-desc">MarkAsRead, MarkAllRead,<br/>GetNotifications</div>
+        </div>
+      </div>
+
+      <div class="section-label">Business Logic</div>
+      <div class="row">
+        <div class="card comp-service" id="notif-svc">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">Notification Service</div>
+          <div class="card-desc">Creates notification record.<br/>Determines recipient.<br/>Deduplication (no double notify).</div>
+        </div>
+        <div class="card comp-handler" id="h-read">
+          <div class="card-type">Component · Handler</div>
+          <div class="card-name">Read Handler</div>
+          <div class="card-desc">Mark one or all notifications as read.</div>
+        </div>
+      </div>
+
+      <div class="section-label">Data Access &amp; Delivery</div>
+      <div class="row">
+        <div class="card comp-repo" id="notif-repo">
+          <div class="card-type">Component · Repository</div>
+          <div class="card-name">Notification Repository</div>
+          <div class="card-desc">INSERT notification.<br/>UPDATE read status.<br/>GET by user, paginated.</div>
+        </div>
+        <div class="card comp-client" id="push-client">
+          <div class="card-type">Component · Client</div>
+          <div class="card-name">Push Client</div>
+          <div class="card-desc">Sends push via FCM (Android)<br/>or APNs (iOS) asynchronously.<br/>Failure does not fail the event ack.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row row-external-bottom">
+      <div class="ext-db" id="notif-db">
+        <div class="card-type">Database</div>
+        <div class="card-name">notif_db</div>
+        <div class="card-tech">[PostgreSQL]</div>
+      </div>
+      <div class="ext-third" id="fcm">
+        <div class="card-type">External</div>
+        <div class="card-name">FCM / APNs</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-box leg-worker"></div>Async worker</div>
+    <div class="legend-item"><div class="legend-box leg-entry"></div>Entry (sync)</div>
+    <div class="legend-item"><div class="legend-box leg-service"></div>Service</div>
+    <div class="legend-item"><div class="legend-box leg-handler"></div>Handler</div>
+    <div class="legend-item"><div class="legend-box leg-repo"></div>Repository</div>
+    <div class="legend-item"><div class="legend-box leg-client"></div>Client</div>
+  </div>
+
+  <script src="arrows.js"></script>
+  <script>
+    window.addEventListener('load', () => {
+      const d   = document.getElementById('diagram');
+      const svg = document.getElementById('svg-layer');
+      initSvg(svg, d);
+      const B = '#3b82f6', P = '#7c3aed', G = '#475569', O = '#f59e0b';
+
+      arrow(svg,d,'queue-in','bottom','queue-consumer','top',   O,true,'events');
+      arrow(svg,d,'gateway-caller','bottom','grpc-server','top', B,false,'gRPC');
+
+      arrow(svg,d,'queue-consumer','bottom','notif-svc','top',  O,false,'');
+      arrow(svg,d,'grpc-server','bottom','h-read','top',        B,false,'');
+
+      arrow(svg,d,'notif-svc','bottom','notif-repo','top',      G,false,'write');
+      arrow(svg,d,'notif-svc','bottom','push-client','top',     O,false,'push');
+      arrow(svg,d,'h-read','bottom','notif-repo','top',         G,false,'update');
+
+      arrow(svg,d,'notif-repo','bottom','notif-db','top',  G,false,'SQL');
+      arrow(svg,d,'push-client','bottom','fcm','top',      O,true,'HTTP');
+    });
+    window.addEventListener('resize', () => location.reload());
+  </script>
+</body>
+</html>

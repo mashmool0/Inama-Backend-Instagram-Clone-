@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inama — L3: Auth Service</title>
+  <link rel="stylesheet" href="level3.css" />
+</head>
+<body>
+  <div class="nav">
+    <a href="level3-index.html">← L3 Index</a>
+    <a href="level3-gateway.html">← Gateway</a>
+    <a href="level3-user.html">User →</a>
+  </div>
+  <header>
+    <h1>Auth Service</h1>
+    <p>C4 Level 3 · Component Diagram</p>
+    <div class="subtitle">FastAPI · Python · Cold path — login, register, OTP, password reset</div>
+  </header>
+
+  <div class="diagram" id="diagram">
+    <svg id="svg-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+
+    <div class="container-boundary">
+      <div class="container-boundary-label">Auth Service</div>
+      <div class="container-boundary-tech">[FastAPI · Python]</div>
+
+      <div class="row">
+        <div class="card comp-entry" id="grpc-server">
+          <div class="card-type">Component · Entry</div>
+          <div class="card-name">gRPC Server</div>
+          <div class="card-desc">Exposes Auth service proto.<br/>Routes to handlers.</div>
+        </div>
+      </div>
+
+      <div class="section-label">Handlers</div>
+      <div class="row">
+        <div class="card comp-handler" id="h-register">
+          <div class="card-type">Component · Handler</div>
+          <div class="card-name">Register Handler</div>
+          <div class="card-desc">Phone → send OTP → store pending user</div>
+        </div>
+        <div class="card comp-handler" id="h-otp">
+          <div class="card-type">Component · Handler</div>
+          <div class="card-name">OTP Verify Handler</div>
+          <div class="card-desc">Verify code → create user → issue JWT</div>
+        </div>
+        <div class="card comp-handler" id="h-login">
+          <div class="card-type">Component · Handler</div>
+          <div class="card-name">Login Handler</div>
+          <div class="card-desc">Credentials → verify → issue JWT + refresh</div>
+        </div>
+        <div class="card comp-handler" id="h-reset">
+          <div class="card-type">Component · Handler</div>
+          <div class="card-name">Password Reset Handler</div>
+          <div class="card-desc">Request reset → verify token → update password</div>
+        </div>
+      </div>
+
+      <div class="section-label">Business Logic</div>
+      <div class="row">
+        <div class="card comp-service" id="otp-svc">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">OTP Service</div>
+          <div class="card-desc">Generate code, store in Redis with TTL, verify on submit.</div>
+        </div>
+        <div class="card comp-service" id="jwt-svc">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">JWT Service</div>
+          <div class="card-desc">Issue access + refresh tokens.<br/>Validate and rotate tokens.</div>
+        </div>
+        <div class="card comp-service" id="password-svc">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">Password Service</div>
+          <div class="card-desc">bcrypt hash + verify.<br/>Intentionally slow — brute-force protection.</div>
+        </div>
+      </div>
+
+      <div class="section-label">Data Access</div>
+      <div class="row">
+        <div class="card comp-repo" id="user-repo">
+          <div class="card-type">Component · Repository</div>
+          <div class="card-name">User Repository</div>
+          <div class="card-desc">Create, lookup by phone/id.<br/>auth_db.users</div>
+        </div>
+        <div class="card comp-repo" id="token-repo">
+          <div class="card-type">Component · Repository</div>
+          <div class="card-name">Token Repository</div>
+          <div class="card-desc">Store refresh tokens.<br/>auth_db.refresh_tokens</div>
+        </div>
+      </div>
+
+      <div class="section-label">External Clients</div>
+      <div class="row">
+        <div class="card comp-client" id="sms-client">
+          <div class="card-type">Component · Client</div>
+          <div class="card-name">SMS Client</div>
+          <div class="card-desc">Calls SMS provider API to deliver OTP.</div>
+        </div>
+        <div class="card comp-client" id="email-client">
+          <div class="card-type">Component · Client</div>
+          <div class="card-name">Email Client</div>
+          <div class="card-desc">Sends password reset email via SMTP / provider.</div>
+        </div>
+        <div class="card comp-client" id="redis-client">
+          <div class="card-type">Component · Client</div>
+          <div class="card-name">Redis Client</div>
+          <div class="card-desc">OTP codes with TTL, token blacklist.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row row-external-bottom">
+      <div class="ext-db" id="auth-db">
+        <div class="card-type">Database</div>
+        <div class="card-name">auth_db</div>
+        <div class="card-tech">[PostgreSQL]</div>
+      </div>
+      <div class="ext-redis" id="redis">
+        <div class="card-type">Cache</div>
+        <div class="card-name">Redis</div>
+      </div>
+      <div class="ext-third" id="sms-ext">
+        <div class="card-type">External</div>
+        <div class="card-name">SMS Provider</div>
+      </div>
+      <div class="ext-third" id="email-ext">
+        <div class="card-type">External</div>
+        <div class="card-name">Email Provider</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-box leg-entry"></div>Entry</div>
+    <div class="legend-item"><div class="legend-box leg-handler"></div>Handler</div>
+    <div class="legend-item"><div class="legend-box leg-service"></div>Service</div>
+    <div class="legend-item"><div class="legend-box leg-repo"></div>Repository</div>
+    <div class="legend-item"><div class="legend-box leg-client"></div>Client</div>
+  </div>
+
+  <script src="arrows.js"></script>
+  <script>
+    window.addEventListener('load', () => {
+      const d = document.getElementById('diagram');
+      const svg = document.getElementById('svg-layer');
+      initSvg(svg, d);
+      const B = '#3b82f6', P = '#7c3aed', G = '#475569', R = '#ef4444';
+
+      arrow(svg,d,'grpc-server','bottom','h-register','top', B,false,'');
+      arrow(svg,d,'grpc-server','bottom','h-otp','top',      B,false,'');
+      arrow(svg,d,'grpc-server','bottom','h-login','top',    B,false,'');
+      arrow(svg,d,'grpc-server','bottom','h-reset','top',    B,false,'');
+
+      arrow(svg,d,'h-register','bottom','otp-svc','top',     P,false,'');
+      arrow(svg,d,'h-otp','bottom','otp-svc','top',          P,false,'verify');
+      arrow(svg,d,'h-otp','bottom','jwt-svc','top',          P,false,'issue JWT');
+      arrow(svg,d,'h-login','bottom','password-svc','top',   P,false,'verify hash');
+      arrow(svg,d,'h-login','bottom','jwt-svc','top',        P,false,'');
+      arrow(svg,d,'h-reset','bottom','password-svc','top',   P,false,'rehash');
+
+      arrow(svg,d,'otp-svc','bottom','redis-client','top',   G,false,'store/read OTP');
+      arrow(svg,d,'h-register','bottom','user-repo','top',   G,false,'');
+      arrow(svg,d,'h-otp','bottom','user-repo','top',        G,false,'create user');
+      arrow(svg,d,'jwt-svc','bottom','token-repo','top',     G,false,'store refresh');
+
+      arrow(svg,d,'otp-svc','bottom','sms-client','top',     G,false,'send OTP');
+      arrow(svg,d,'h-reset','bottom','email-client','top',   G,false,'send email');
+
+      arrow(svg,d,'user-repo','bottom','auth-db','top',      G,false,'SQL');
+      arrow(svg,d,'token-repo','bottom','auth-db','top',     G,false,'SQL');
+      arrow(svg,d,'redis-client','bottom','redis','top',     R,false,'');
+      arrow(svg,d,'sms-client','bottom','sms-ext','top',     G,false,'HTTP');
+      arrow(svg,d,'email-client','bottom','email-ext','top', G,false,'SMTP');
+    });
+    window.addEventListener('resize', () => location.reload());
+  </script>
+</body>
+</html>

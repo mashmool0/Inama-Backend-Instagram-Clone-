@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inama — L3: Search Indexer</title>
+  <link rel="stylesheet" href="level3.css" />
+</head>
+<body>
+  <div class="nav">
+    <a href="level3-index.html">← L3 Index</a>
+    <a href="level3-notifications.html">← Notifications</a>
+  </div>
+  <header>
+    <h1>Search Indexer Service</h1>
+    <p>C4 Level 3 · Component Diagram</p>
+    <div class="subtitle">FastAPI · Python · Two paths: async indexing + sync search queries</div>
+  </header>
+
+  <div class="diagram" id="diagram">
+    <svg id="svg-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+
+    <div class="row">
+      <div class="ext-queue" id="queue-in">
+        <div class="card-type">Message Broker</div>
+        <div class="card-name">Message Queue</div>
+      </div>
+      <div class="ext-service" id="gateway-caller">
+        <div class="card-type">Caller</div>
+        <div class="card-name">API Gateway</div>
+      </div>
+    </div>
+
+    <div class="container-boundary">
+      <div class="container-boundary-label">Search Indexer Service</div>
+      <div class="container-boundary-tech">[FastAPI · Python]</div>
+
+      <div class="row">
+        <div class="card comp-worker" id="queue-consumer">
+          <div class="card-type">Component · Queue Consumer</div>
+          <div class="card-name">Event Consumer</div>
+          <div class="card-desc">Consumes post.created.<br/>Triggers indexing pipeline.</div>
+        </div>
+        <div class="card comp-entry" id="grpc-server">
+          <div class="card-type">Component · Entry</div>
+          <div class="card-name">gRPC Server</div>
+          <div class="card-desc">Exposes Search(query, type) RPC.</div>
+        </div>
+      </div>
+
+      <div class="section-label">Indexing Pipeline</div>
+      <div class="row">
+        <div class="card comp-service" id="indexer-svc">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">Indexer Service</div>
+          <div class="card-desc">Orchestrates indexing.<br/>Builds the ES document from the event payload.</div>
+        </div>
+        <div class="card comp-service" id="hashtag-extractor">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">Hashtag Extractor</div>
+          <div class="card-desc">Parses caption for #tags.<br/>Returns normalized list for indexing.</div>
+        </div>
+      </div>
+
+      <div class="section-label">Search Path</div>
+      <div class="row">
+        <div class="card comp-handler" id="h-search">
+          <div class="card-type">Component · Handler</div>
+          <div class="card-name">Search Handler</div>
+          <div class="card-desc">Routes to correct search strategy<br/>based on type: user / hashtag / text.</div>
+        </div>
+        <div class="card comp-service" id="search-svc">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">Search Service</div>
+          <div class="card-desc">Builds Elasticsearch query.<br/>Formats + returns results.</div>
+        </div>
+      </div>
+
+      <div class="section-label">Data Access</div>
+      <div class="row">
+        <div class="card comp-client" id="es-client">
+          <div class="card-type">Component · Client</div>
+          <div class="card-name">Elasticsearch Client</div>
+          <div class="card-desc">elasticsearch-py.<br/>Index documents, run queries.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row row-external-bottom">
+      <div class="ext-third" id="es">
+        <div class="card-type">External · Search Engine</div>
+        <div class="card-name">Elasticsearch</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-box leg-worker"></div>Async consumer</div>
+    <div class="legend-item"><div class="legend-box leg-entry"></div>Entry (sync)</div>
+    <div class="legend-item"><div class="legend-box leg-service"></div>Service</div>
+    <div class="legend-item"><div class="legend-box leg-handler"></div>Handler</div>
+    <div class="legend-item"><div class="legend-box leg-client"></div>Client</div>
+  </div>
+
+  <script src="arrows.js"></script>
+  <script>
+    window.addEventListener('load', () => {
+      const d   = document.getElementById('diagram');
+      const svg = document.getElementById('svg-layer');
+      initSvg(svg, d);
+      const B = '#3b82f6', P = '#7c3aed', G = '#475569', O = '#f59e0b';
+
+      arrow(svg,d,'queue-in','bottom','queue-consumer','top',   O,true,'post.created');
+      arrow(svg,d,'gateway-caller','bottom','grpc-server','top', B,false,'gRPC');
+
+      arrow(svg,d,'queue-consumer','bottom','indexer-svc','top',  O,false,'');
+      arrow(svg,d,'indexer-svc','right','hashtag-extractor','left', P,false,'extract #tags');
+      arrow(svg,d,'indexer-svc','bottom','es-client','top',        G,false,'index doc');
+
+      arrow(svg,d,'grpc-server','bottom','h-search','top',   B,false,'');
+      arrow(svg,d,'h-search','bottom','search-svc','top',    P,false,'');
+      arrow(svg,d,'search-svc','bottom','es-client','top',   G,false,'query');
+
+      arrow(svg,d,'es-client','bottom','es','top', G,false,'HTTP');
+    });
+    window.addEventListener('resize', () => location.reload());
+  </script>
+</body>
+</html>

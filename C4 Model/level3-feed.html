@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inama — L3: Feed + Explore</title>
+  <link rel="stylesheet" href="level3.css" />
+</head>
+<body>
+  <div class="nav">
+    <a href="level3-index.html">← L3 Index</a>
+    <a href="level3-posts.html">← Posts</a>
+    <a href="level3-notifications.html">Notifications →</a>
+  </div>
+  <header>
+    <h1>Feed + Explore Service</h1>
+    <p>C4 Level 3 · Component Diagram</p>
+    <div class="subtitle">Go · Most complex service — sync read path + async fanout worker</div>
+  </header>
+
+  <div class="diagram" id="diagram">
+    <svg id="svg-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+
+    <!-- Two entry points side by side -->
+    <div class="row">
+      <div class="ext-service" id="gateway-caller">
+        <div class="card-type">Caller</div>
+        <div class="card-name">API Gateway</div>
+      </div>
+      <div class="ext-queue" id="queue-in">
+        <div class="card-type">Message Broker</div>
+        <div class="card-name">Message Queue</div>
+      </div>
+    </div>
+
+    <div class="container-boundary">
+      <div class="container-boundary-label">Feed + Explore Service</div>
+      <div class="container-boundary-tech">[Go]</div>
+
+      <div class="section-label">Sync Path — Feed &amp; Explore reads</div>
+      <div class="row">
+        <div class="card comp-entry" id="grpc-server">
+          <div class="card-type">Component · Entry</div>
+          <div class="card-name">gRPC Server</div>
+          <div class="card-desc">Handles GetFeed and GetExplore requests.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="card comp-handler" id="h-feed">
+          <div class="card-type">Component · Handler</div>
+          <div class="card-name">Feed Handler</div>
+          <div class="card-desc">GetFeed(user_id, cursor, limit)</div>
+        </div>
+        <div class="card comp-handler" id="h-explore">
+          <div class="card-type">Component · Handler</div>
+          <div class="card-name">Explore Handler</div>
+          <div class="card-desc">GetExplore(cursor, limit)</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="card comp-service" id="feed-reader">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">Feed Reader</div>
+          <div class="card-desc">Reads precomputed feed_items for this user.<br/>Cursor-based pagination.<br/>(Phase 1: fan-out-on-read query)</div>
+        </div>
+        <div class="card comp-service" id="explore-svc">
+          <div class="card-type">Component · Service</div>
+          <div class="card-name">Explore Service</div>
+          <div class="card-desc">Returns random recent public posts.<br/>Reads from Redis cache (TTL 5min).<br/>Cache miss → query posts_db via Posts client.</div>
+        </div>
+      </div>
+
+      <div class="section-label">Async Path — Fanout Worker</div>
+      <div class="row">
+        <div class="card comp-worker" id="fanout-consumer">
+          <div class="card-type">Component · Queue Consumer</div>
+          <div class="card-name">Queue Consumer</div>
+          <div class="card-desc">Subscribes to post.created events.<br/>Acks only after fanout completes.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="card comp-worker" id="fanout-worker">
+          <div class="card-type">Component · Worker</div>
+          <div class="card-name">Fanout Worker</div>
+          <div class="card-desc">Fetches all follower IDs from User service.<br/>Writes feed_items for each follower<br/>in concurrent goroutine batches.</div>
+        </div>
+        <div class="card comp-client" id="user-client">
+          <div class="card-type">Component · gRPC Client</div>
+          <div class="card-name">User Service Client</div>
+          <div class="card-desc">Calls GetFollowers(author_id).<br/>Returns list of follower IDs.</div>
+        </div>
+      </div>
+
+      <div class="section-label">Data Access</div>
+      <div class="row">
+        <div class="card comp-repo" id="feed-repo">
+          <div class="card-type">Component · Repository</div>
+          <div class="card-name">Feed Repository</div>
+          <div class="card-desc">Read feed_items by user.<br/>Bulk insert feed_items (fanout).</div>
+        </div>
+        <div class="card comp-client" id="redis-client">
+          <div class="card-type">Component · Client</div>
+          <div class="card-name">Redis Client</div>
+          <div class="card-desc">Explore cache (one shared list).<br/>TTL: 5 minutes.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row row-external-bottom">
+      <div class="ext-db" id="feed-db">
+        <div class="card-type">Database</div>
+        <div class="card-name">feed_db</div>
+        <div class="card-tech">[PostgreSQL]</div>
+      </div>
+      <div class="ext-redis" id="redis">
+        <div class="card-type">Cache</div>
+        <div class="card-name">Redis</div>
+      </div>
+      <div class="ext-service" id="user-svc">
+        <div class="card-type">Service</div>
+        <div class="card-name">User Service</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-box leg-entry"></div>Entry (sync)</div>
+    <div class="legend-item"><div class="legend-box leg-handler"></div>Handler</div>
+    <div class="legend-item"><div class="legend-box leg-service"></div>Service</div>
+    <div class="legend-item"><div class="legend-box leg-worker"></div>Async worker</div>
+    <div class="legend-item"><div class="legend-box leg-repo"></div>Repository</div>
+    <div class="legend-item"><div class="legend-box leg-client"></div>Client</div>
+  </div>
+
+  <script src="arrows.js"></script>
+  <script>
+    window.addEventListener('load', () => {
+      const d   = document.getElementById('diagram');
+      const svg = document.getElementById('svg-layer');
+      initSvg(svg, d);
+      const B = '#3b82f6', P = '#7c3aed', G = '#475569', O = '#f59e0b';
+
+      // Callers → entry
+      arrow(svg,d,'gateway-caller','bottom','grpc-server','top',   B,false,'gRPC');
+      arrow(svg,d,'queue-in','bottom','fanout-consumer','top',     O,true,'post.created');
+
+      // Sync path
+      arrow(svg,d,'grpc-server','bottom','h-feed','top',           B,false,'');
+      arrow(svg,d,'grpc-server','bottom','h-explore','top',        B,false,'');
+      arrow(svg,d,'h-feed','bottom','feed-reader','top',           P,false,'');
+      arrow(svg,d,'h-explore','bottom','explore-svc','top',        P,false,'');
+      arrow(svg,d,'feed-reader','bottom','feed-repo','top',        G,false,'read feed_items');
+      arrow(svg,d,'explore-svc','bottom','redis-client','top',     G,false,'cache read');
+
+      // Async fanout path
+      arrow(svg,d,'fanout-consumer','bottom','fanout-worker','top', O,false,'trigger');
+      arrow(svg,d,'fanout-worker','right','user-client','left',     O,false,'GetFollowers');
+      arrow(svg,d,'fanout-worker','bottom','feed-repo','top',       O,false,'bulk insert');
+
+      // External
+      arrow(svg,d,'feed-repo','bottom','feed-db','top',    G,false,'SQL');
+      arrow(svg,d,'redis-client','bottom','redis','top',   '#ef4444',false,'');
+      arrow(svg,d,'user-client','bottom','user-svc','top', B,false,'gRPC');
+    });
+    window.addEventListener('resize', () => location.reload());
+  </script>
+</body>
+</html>

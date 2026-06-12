@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inama — C4 Level 3: Component Diagrams</title>
+  <link rel="stylesheet" href="level3.css" />
+  <style>
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      width: 960px;
+      max-width: 100%;
+      margin-top: 8px;
+    }
+    .tile {
+      background: #151922;
+      border: 2px solid #1e293b;
+      border-radius: 12px;
+      padding: 24px 20px;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s;
+    }
+    .tile:hover { border-color: #334155; }
+    .tile-badge {
+      display: inline-block;
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-bottom: 10px;
+    }
+    .badge-go   { background: #1a2640; color: #60a5fa; }
+    .badge-py   { background: #251e35; color: #c084fc; }
+    .tile-name  { font-size: 1.05rem; font-weight: 700; color: #f1f5f9; margin-bottom: 6px; }
+    .tile-desc  { font-size: 0.72rem; color: #64748b; line-height: 1.5; }
+    .tile-tags  { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .tag {
+      font-size: 0.6rem;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #1e293b;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">← Level 1</a>
+    <a href="level2.html">← Level 2</a>
+  </div>
+
+  <header>
+    <h1>Inama</h1>
+    <p>C4 Model — Level 3 · Component Diagrams</p>
+    <div class="subtitle">Click a container to see its internal components</div>
+  </header>
+
+  <div class="grid">
+
+    <a class="tile" href="level3-gateway.html">
+      <div class="tile-badge badge-go">Go</div>
+      <div class="tile-name">API Gateway</div>
+      <div class="tile-desc">Middleware chain: rate limiting, JWT verification, request routing to all downstream services.</div>
+      <div class="tile-tags">
+        <span class="tag">HTTP in</span>
+        <span class="tag">gRPC out</span>
+        <span class="tag">Redis</span>
+        <span class="tag">Complete</span>
+      </div>
+    </a>
+
+    <a class="tile" href="level3-auth.html">
+      <div class="tile-badge badge-py">FastAPI</div>
+      <div class="tile-name">Auth Service</div>
+      <div class="tile-desc">OTP registration, login, JWT issuance, password reset via email.</div>
+      <div class="tile-tags">
+        <span class="tag">gRPC</span>
+        <span class="tag">Redis</span>
+        <span class="tag">SMS</span>
+        <span class="tag">Email</span>
+      </div>
+    </a>
+
+    <a class="tile" href="level3-user.html">
+      <div class="tile-badge badge-go">Go</div>
+      <div class="tile-name">User / Social Graph</div>
+      <div class="tile-desc">Profile CRUD, follow/unfollow, follower and following lists. Social graph queries for fanout.</div>
+      <div class="tile-tags">
+        <span class="tag">gRPC</span>
+        <span class="tag">user_db</span>
+      </div>
+    </a>
+
+    <a class="tile" href="level3-posts.html">
+      <div class="tile-badge badge-go">Go</div>
+      <div class="tile-name">Posts + Interactions</div>
+      <div class="tile-desc">Post CRUD, likes (atomic), comments, outbox event publisher for downstream consumers.</div>
+      <div class="tile-tags">
+        <span class="tag">gRPC</span>
+        <span class="tag">posts_db</span>
+        <span class="tag">Outbox pattern</span>
+        <span class="tag">Complete</span>
+      </div>
+    </a>
+
+    <a class="tile" href="level3-feed.html">
+      <div class="tile-badge badge-go">Go</div>
+      <div class="tile-name">Feed + Explore</div>
+      <div class="tile-desc">Sync feed reader, async fanout worker, explore cache. Most complex internal structure.</div>
+      <div class="tile-tags">
+        <span class="tag">gRPC</span>
+        <span class="tag">Queue consumer</span>
+        <span class="tag">Redis</span>
+        <span class="tag">Complete</span>
+      </div>
+    </a>
+
+    <a class="tile" href="level3-notifications.html">
+      <div class="tile-badge badge-go">Go</div>
+      <div class="tile-name">Notifications</div>
+      <div class="tile-desc">Consumes like/comment/follow events, writes to DB, delivers push via FCM/APNs.</div>
+      <div class="tile-tags">
+        <span class="tag">Queue consumer</span>
+        <span class="tag">notif_db</span>
+        <span class="tag">FCM/APNs</span>
+      </div>
+    </a>
+
+    <a class="tile" href="level3-search.html">
+      <div class="tile-badge badge-py">FastAPI</div>
+      <div class="tile-name">Search Indexer</div>
+      <div class="tile-desc">Indexes posts into Elasticsearch on creation, serves hashtag and full-text search queries.</div>
+      <div class="tile-tags">
+        <span class="tag">Queue consumer</span>
+        <span class="tag">gRPC</span>
+        <span class="tag">Elasticsearch</span>
+      </div>
+    </a>
+
+  </div>
+</body>
+</html>

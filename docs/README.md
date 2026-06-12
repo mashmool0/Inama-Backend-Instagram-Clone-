@@ -17,6 +17,7 @@ Goal: deep understanding of microservice architecture through real implementatio
 | [06-infrastructure.md](06-infrastructure.md) | Mono-repo, Docker, VPS deployment, CI/CD |
 | [07-monitoring.md](07-monitoring.md) | Prometheus, Grafana, OpenTelemetry tracing |
 | [08-load-testing.md](08-load-testing.md) | Target: 1k req/sec, tools, methodology |
+| [09-roadmap.md](09-roadmap.md) | Phase-by-phase plan for two devs working in parallel |
 
 ---
 

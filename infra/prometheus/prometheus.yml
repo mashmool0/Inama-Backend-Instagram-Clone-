@@ -1,0 +1,28 @@
+# Phase 0 scaffold scrape config. Targets the future /metrics endpoint on
+# each service. Services don't expose /metrics yet — Prometheus will simply
+# show them as "down" until they do. That's expected this early.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: gateway
+    static_configs:
+      - targets: ["gateway:8080"]
+  - job_name: auth
+    static_configs:
+      - targets: ["auth:8000"]
+  - job_name: user
+    static_configs:
+      - targets: ["user:8080"]
+  - job_name: posts
+    static_configs:
+      - targets: ["posts:8080"]
+  - job_name: feed
+    static_configs:
+      - targets: ["feed:8080"]
+  - job_name: notifications
+    static_configs:
+      - targets: ["notifications:8080"]
+  - job_name: search
+    static_configs:
+      - targets: ["search:8000"]

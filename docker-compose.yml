@@ -1,0 +1,105 @@
+# Inama — full stack on one shared network.
+#
+# Run EVERYTHING:        docker compose up --build
+# Run ONE service:       docker compose up --build gateway
+# Run a service + infra:  docker compose up --build auth postgres redis
+# Check a service:       curl localhost:8080/health   (gateway)
+#
+# Services are intentionally NOT wired with depends_on yet, so any one of them
+# can run alone for quick local testing. Add depends_on per service once it
+# actually talks to Postgres/Redis/the broker.
+
+networks:
+  inama-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+
+services:
+  # ---------- Application services ----------
+  gateway:
+    build: ./services/gateway
+    ports: ["8080:8080"]
+    networks: [inama-net]
+    environment:
+      PORT: "8080"
+
+  auth:
+    build: ./services/auth
+    ports: ["8001:8000"]
+    networks: [inama-net]
+
+  user:
+    build: ./services/user
+    ports: ["8082:8080"]
+    networks: [inama-net]
+    environment:
+      PORT: "8080"
+
+  posts:
+    build: ./services/posts
+    ports: ["8083:8080"]
+    networks: [inama-net]
+    environment:
+      PORT: "8080"
+
+  feed:
+    build: ./services/feed
+    ports: ["8084:8080"]
+    networks: [inama-net]
+    environment:
+      PORT: "8080"
+
+  notifications:
+    build: ./services/notifications
+    ports: ["8085:8080"]
+    networks: [inama-net]
+    environment:
+      PORT: "8080"
+
+  search:
+    build: ./services/search
+    ports: ["8086:8000"]
+    networks: [inama-net]
+
+  # ---------- Infrastructure ----------
+  postgres:
+    image: postgres:16-alpine
+    ports: ["5432:5432"]
+    networks: [inama-net]
+    environment:
+      POSTGRES_USER: inama
+      POSTGRES_PASSWORD: inama
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    networks: [inama-net]
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports: ["9090:9090"]
+    networks: [inama-net]
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana:latest
+    ports: ["3000:3000"]
+    networks: [inama-net]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+
+  # ---------- TBD — uncomment once decided (CLAUDE.md open decisions) ----------
+  # Message broker: Kafka vs RabbitMQ is NOT decided yet. Needed by Phase 2.
+  # broker:
+  #   image: ...
+
+  # Elasticsearch: needed by Search in Phase 3, heavy to run — off until then.
+  # elasticsearch:
+  #   image: docker.elastic.co/elasticsearch/elasticsearch:8.x

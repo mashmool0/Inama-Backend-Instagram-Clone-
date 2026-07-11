@@ -1,0 +1,15 @@
+# buf module config. `proto/` is the import root, so a file references another
+# by its path from there (e.g. feed imports "posts/posts.proto").
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+  except:
+    # Our dirs are auth/, user/, ... but packages are inama.auth.v1 etc.
+    # We keep short dirs on purpose, so relax the dir==package rule.
+    - PACKAGE_DIRECTORY_MATCH
+breaking:
+  use:
+    - FILE

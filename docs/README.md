@@ -9,6 +9,7 @@ Goal: deep understanding of microservice architecture through real implementatio
 
 | File | What it covers |
 |---|---|
+| [getting-started.md](getting-started.md) | **New here? Start with this.** Setup → run the stack → your first service |
 | [01-architecture-overview.md](01-architecture-overview.md) | Big picture, service map, C4 thinking |
 | [02-services.md](02-services.md) | Each service, language, database, responsibilities |
 | [03-database-strategy.md](03-database-strategy.md) | Per-service DBs, primary + replicas, read/write split |

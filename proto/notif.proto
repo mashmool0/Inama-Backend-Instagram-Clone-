@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package inama.notif.v1;
+
+option go_package = "github.com/mashmool0/inama/proto/gen/notif;notifpb";
+
+// Recipient = x-user-id from gRPC metadata. Notifications are created by the
+// queue consumer (from post.liked / comment.created / user.followed events),
+// not by a gRPC write — this service only serves reads + mark-as-read.
+
+import "google/protobuf/timestamp.proto";
+
+service NotificationsService {
+  rpc GetNotifications(GetNotificationsRequest) returns (NotificationPage);
+  rpc MarkAsRead(MarkAsReadRequest) returns (MarkResponse);
+  rpc MarkAllRead(MarkAllReadRequest) returns (MarkResponse);
+}
+
+enum NotificationType {
+  NOTIFICATION_TYPE_UNSPECIFIED = 0;
+  NOTIFICATION_TYPE_LIKE = 1;
+  NOTIFICATION_TYPE_COMMENT = 2;
+  NOTIFICATION_TYPE_FOLLOW = 3;
+}
+
+message Notification {
+  string id = 1;
+  NotificationType type = 2;
+  string actor_id = 3;          // who caused it (liked/commented/followed)
+  string post_id = 4;           // empty for follow notifications
+  bool is_read = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message GetNotificationsRequest {
+  int32 limit = 1;
+  string cursor = 2;
+}
+message NotificationPage {
+  repeated Notification notifications = 1;
+  string next_cursor = 2;
+}
+
+message MarkAsReadRequest {
+  string notification_id = 1;
+}
+message MarkAllReadRequest {}
+
+message MarkResponse { bool success = 1; }

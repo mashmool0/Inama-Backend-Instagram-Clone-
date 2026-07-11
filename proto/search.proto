@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package inama.search.v1;
+
+option go_package = "github.com/mashmool0/inama/proto/gen/search;searchpb";
+
+// Search is read-only over Elasticsearch. Indexing happens async via the
+// post.created queue consumer (no RPC). Results are lightweight summaries;
+// the client hydrates full detail from Posts/User if needed.
+
+service SearchService {
+  rpc Search(SearchRequest) returns (SearchResponse);
+}
+
+enum SearchType {
+  SEARCH_TYPE_UNSPECIFIED = 0; // treat as ALL
+  SEARCH_TYPE_USER = 1;
+  SEARCH_TYPE_HASHTAG = 2;
+  SEARCH_TYPE_TEXT = 3;
+}
+
+message SearchRequest {
+  string query = 1;
+  SearchType type = 2;
+  int32 limit = 3;
+  string cursor = 4;
+}
+
+message UserResult {
+  string user_id = 1;
+  string username = 2;
+  string avatar_url = 3;
+}
+
+message PostResult {
+  string post_id = 1;
+  string author_id = 2;
+  string caption = 3;
+  string media_url = 4;
+}
+
+message SearchResponse {
+  repeated UserResult users = 1;
+  repeated PostResult posts = 2;
+  string next_cursor = 3;
+}

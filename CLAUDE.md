@@ -10,17 +10,20 @@
 | Databases | Per-service (auth_db, user_db, posts_db, feed_db, notif_db) on one Postgres instance |
 | DB topology | 1 primary + 2 read replicas |
 | Sync calls | gRPC only |
-| Async events | Message queue (Kafka or RabbitMQ — **TBD**) |
+| Async events | RabbitMQ — topic exchange `inama.events`, JSON payloads |
+| Entity IDs | UUID strings everywhere (protos + DB) |
+| Identity propagation | Verified `user_id` in gRPC metadata (`x-user-id`); Gateway verifies JWT locally with public key |
+| Time / pagination | `google.protobuf.Timestamp`; opaque cursor strings |
 | Languages | Go: Gateway, User, Posts, Feed, Notifications — FastAPI: Auth, Search |
 | Feed (now) | Fan-out-on-read + cursor pagination — planned bottleneck, migrate after load test |
 | Feed (target) | Fan-out-on-write with fanout worker |
+| feed_db storage | Postgres `feed_items` table |
 | Load target | Test: 1k req/sec, p95 < 500ms — Design: 10k req/sec |
 | Monitoring | Prometheus + Grafana + OpenTelemetry (tracing before first load test) |
 
 ## Open Decisions — Must Discuss Before Implementing
 
-- Kafka vs RabbitMQ (message broker choice)
-- feed_db storage: Postgres feed_items table vs Redis lists
+- _(none currently — broker, feed_db, ID type, and identity propagation all resolved 2026-07-11. See table above.)_
 
 ## Current Build Phase
 

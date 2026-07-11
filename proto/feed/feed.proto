@@ -8,7 +8,7 @@ option go_package = "github.com/mashmool0/inama/proto/gen/feed;feedpb";
 // rather than redefining it — the feed IS a list of posts. This is an
 // intentional proto dependency. The viewing user comes from gRPC metadata.
 
-import "posts.proto";
+import "posts/posts.proto";
 
 service FeedService {
   rpc GetFeed(GetFeedRequest) returns (PostPage);       // posts from followed users

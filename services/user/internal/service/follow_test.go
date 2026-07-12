@@ -109,6 +109,23 @@ func TestFollowManagerFollowRejectsMissingTarget(t *testing.T) {
 	}
 }
 
+func TestFollowManagerUnfollowRejectsMissingTarget(t *testing.T) {
+	t.Parallel()
+
+	svc := &FollowManager{
+		users: stubUserFollowStore{
+			existsFn: func(_ context.Context, userID string) (bool, error) {
+				return userID == "actor", nil
+			},
+		},
+	}
+
+	_, err := svc.Unfollow(context.Background(), "actor", "missing")
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("Unfollow() error = %v, want ErrNotFound", err)
+	}
+}
+
 func TestFollowManagerNormalizeLimitCapsValues(t *testing.T) {
 	t.Parallel()
 

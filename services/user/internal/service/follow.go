@@ -97,6 +97,9 @@ func (s *FollowManager) Unfollow(ctx context.Context, actorID, targetUserID stri
 	if err := validateFollowActorAndTarget(actorID, targetUserID); err != nil {
 		return false, err
 	}
+	if err := s.ensureUsersExist(ctx, actorID, targetUserID); err != nil {
+		return false, err
+	}
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -215,7 +218,7 @@ func validateFollowActorAndTarget(actorID, targetUserID string) error {
 		return NewInvalidArgument("target_user_id is required")
 	}
 	if actorID == targetUserID {
-		return NewInvalidArgument("cannot follow yourself")
+		return NewInvalidArgument("cannot target yourself")
 	}
 	return nil
 }

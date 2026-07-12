@@ -14,6 +14,7 @@ import (
 
 	usergrpc "github.com/mashmool0/inama/services/user/internal/handler/grpc"
 	userconfig "github.com/mashmool0/inama/services/user/internal/config"
+	userevents "github.com/mashmool0/inama/services/user/internal/events"
 	"github.com/mashmool0/inama/services/user/internal/repository"
 	"github.com/mashmool0/inama/services/user/internal/schema"
 	"github.com/mashmool0/inama/services/user/internal/service"
@@ -47,8 +48,9 @@ func main() {
 
 	userRepo := repository.NewUserRepository(pool)
 	followRepo := repository.NewFollowRepository(pool)
-	profileService := service.NewProfileService(userRepo)
-	followService := service.NewFollowService(pool, userRepo, followRepo, cfg.DefaultPageLimit, cfg.MaxPageLimit)
+	publisher := userevents.NopPublisher{}
+	profileService := service.NewProfileService(userRepo, publisher)
+	followService := service.NewFollowService(pool, userRepo, followRepo, publisher, cfg.DefaultPageLimit, cfg.MaxPageLimit)
 
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(sharedidentity.UnaryServerInterceptor()),

@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/mashmool0/inama/services/user/internal/events"
 	"github.com/mashmool0/inama/services/user/internal/model"
 )
 
@@ -21,11 +22,12 @@ type userReaderWriter interface {
 }
 
 type ProfileManager struct {
-	users userReaderWriter
+	users     userReaderWriter
+	publisher events.Publisher
 }
 
-func NewProfileService(users userReaderWriter) *ProfileManager {
-	return &ProfileManager{users: users}
+func NewProfileService(users userReaderWriter, publisher events.Publisher) *ProfileManager {
+	return &ProfileManager{users: users, publisher: publisher}
 }
 
 func (s *ProfileManager) GetProfile(ctx context.Context, userID string) (model.Profile, error) {
@@ -49,6 +51,14 @@ func (s *ProfileManager) UpdateProfile(ctx context.Context, actorID string, inpu
 		return model.Profile{}, ErrUnauthenticated
 	}
 
+	before, err := s.users.GetByID(ctx, actorID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.Profile{}, ErrNotFound
+		}
+		return model.Profile{}, err
+	}
+
 	profile, err := s.users.UpdateProfileFields(ctx, actorID, input)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -61,6 +71,16 @@ func (s *ProfileManager) UpdateProfile(ctx context.Context, actorID string, inpu
 		}
 
 		return model.Profile{}, err
+	}
+
+	if before.Username != profile.Username || before.AvatarURL != profile.AvatarURL {
+		if err := s.publisher.UserUpdated(ctx, events.UserUpdatedPayload{
+			UserID:    profile.ID,
+			Username:  profile.Username,
+			AvatarURL: profile.AvatarURL,
+		}); err != nil {
+			return model.Profile{}, err
+		}
 	}
 
 	return profile, nil

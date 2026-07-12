@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/mashmool0/inama/services/user/internal/events"
 	"github.com/mashmool0/inama/services/user/internal/model"
 	"github.com/mashmool0/inama/services/user/internal/pagination"
 )
@@ -35,15 +36,17 @@ type FollowManager struct {
 	pool         *pgxpool.Pool
 	users        userFollowStore
 	follows      followStore
+	publisher    events.Publisher
 	defaultLimit int32
 	maxLimit     int32
 }
 
-func NewFollowService(pool *pgxpool.Pool, users userFollowStore, follows followStore, defaultLimit, maxLimit int32) *FollowManager {
+func NewFollowService(pool *pgxpool.Pool, users userFollowStore, follows followStore, publisher events.Publisher, defaultLimit, maxLimit int32) *FollowManager {
 	return &FollowManager{
 		pool:         pool,
 		users:        users,
 		follows:      follows,
+		publisher:    publisher,
 		defaultLimit: defaultLimit,
 		maxLimit:     maxLimit,
 	}
@@ -76,6 +79,15 @@ func (s *FollowManager) Follow(ctx context.Context, actorID, targetUserID string
 
 	if err := tx.Commit(ctx); err != nil {
 		return false, err
+	}
+
+	if created {
+		if err := s.publisher.UserFollowed(ctx, events.UserFollowedPayload{
+			FollowerID: actorID,
+			FolloweeID: targetUserID,
+		}); err != nil {
+			return false, err
+		}
 	}
 
 	return created, nil

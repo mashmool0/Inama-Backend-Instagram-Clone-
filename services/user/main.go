@@ -13,21 +13,37 @@ import (
 	"time"
 
 	usergrpc "github.com/mashmool0/inama/services/user/internal/handler/grpc"
+	userconfig "github.com/mashmool0/inama/services/user/internal/config"
+	"github.com/mashmool0/inama/services/user/internal/repository"
+	"github.com/mashmool0/inama/services/user/internal/schema"
 	"github.com/mashmool0/inama/services/user/internal/service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	sharedconfig "github.com/mashmool0/inama/libs/config"
 	sharedidentity "github.com/mashmool0/inama/libs/identity"
 	sharedlogging "github.com/mashmool0/inama/libs/logging"
 )
 
 func main() {
-	cfg := sharedconfig.LoadBase("user")
+	cfg := userconfig.Load()
 	logger := sharedlogging.New(cfg.ServiceName)
 
 	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	pool, err := repository.OpenPool(rootCtx, cfg.DatabaseURL)
+	if err != nil {
+		logger.Error("failed to connect to postgres", "error", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+
+	if cfg.AutoBootstrapSchema {
+		if err := schema.Bootstrap(rootCtx, pool); err != nil {
+			logger.Error("failed to bootstrap schema", "error", err)
+			os.Exit(1)
+		}
+	}
 
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(sharedidentity.UnaryServerInterceptor()),

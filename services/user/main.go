@@ -45,10 +45,15 @@ func main() {
 		}
 	}
 
+	userRepo := repository.NewUserRepository(pool)
+	followRepo := repository.NewFollowRepository(pool)
+	profileService := service.NewProfileService(userRepo)
+	followService := service.NewFollowService(pool, userRepo, followRepo, cfg.DefaultPageLimit, cfg.MaxPageLimit)
+
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(sharedidentity.UnaryServerInterceptor()),
 	)
-	usergrpc.Register(grpcServer, service.NoopProfileService{}, service.NoopFollowService{})
+	usergrpc.Register(grpcServer, profileService, followService)
 	reflection.Register(grpcServer)
 
 	httpMux := http.NewServeMux()

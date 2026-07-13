@@ -115,7 +115,7 @@ func main() {
 	}()
 
 	go func() {
-		logger.Info("starting queue worker shell")
+		logger.Info("starting queue worker")
 		if err := worker.Run(rootCtx); err != nil && !errors.Is(err, context.Canceled) {
 			errCh <- err
 		}

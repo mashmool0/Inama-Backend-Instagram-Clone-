@@ -2,9 +2,7 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -127,26 +125,3 @@ WHERE recipient_id = $1 AND is_read = FALSE
 	}
 	return nil
 }
-
-func (r *NotificationRepository) InsertNotificationFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
-	if len(fields) == 0 {
-		return nil
-	}
-	columns := make([]string, 0, len(fields))
-	placeholders := make([]string, 0, len(fields))
-	args := make([]any, 0, len(fields))
-	idx := 1
-	for column, value := range fields {
-		columns = append(columns, column)
-		placeholders = append(placeholders, fmt.Sprintf("$%d", idx))
-		args = append(args, value)
-		idx++
-	}
-	query := fmt.Sprintf("INSERT INTO notifications (%s) VALUES (%s)", strings.Join(columns, ", "), strings.Join(placeholders, ", "))
-	if _, err := tx.Exec(ctx, query, args...); err != nil {
-		return err
-	}
-	return nil
-}
-
-var ErrDuplicateProcessedEvent = errors.New("duplicate processed event")

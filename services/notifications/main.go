@@ -16,6 +16,7 @@ import (
 	sharedlogging "github.com/mashmool0/inama/libs/logging"
 	notifconfig "github.com/mashmool0/inama/services/notifications/internal/config"
 	notifgrpc "github.com/mashmool0/inama/services/notifications/internal/handler/grpc"
+	"github.com/mashmool0/inama/services/notifications/internal/push"
 	"github.com/mashmool0/inama/services/notifications/internal/queue"
 	"github.com/mashmool0/inama/services/notifications/internal/repository"
 	"github.com/mashmool0/inama/services/notifications/internal/schema"
@@ -57,10 +58,16 @@ func main() {
 	}
 	defer broker.Close()
 
+	notificationRepo := repository.NewNotificationRepository(pool)
+	processedEventRepo := repository.NewProcessedEventRepository(pool)
+	pushClient := push.NopClient{}
+	readService := service.NewReadService(notificationRepo, cfg.DefaultPageLimit, cfg.MaxPageLimit)
+	processor := service.NewProcessor(pool, notificationRepo, processedEventRepo, pushClient)
+
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(sharedidentity.UnaryServerInterceptor()),
 	)
-	notifgrpc.Register(grpcServer, service.NoopReadService{})
+	notifgrpc.Register(grpcServer, readService)
 	reflection.Register(grpcServer)
 
 	httpMux := http.NewServeMux()
@@ -85,7 +92,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	worker := queue.NewWorker(broker)
+	worker := queue.NewWorker(broker, processor)
 	errCh := make(chan error, 3)
 
 	go func() {

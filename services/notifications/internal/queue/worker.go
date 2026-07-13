@@ -6,6 +6,8 @@ import (
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+
+	"github.com/mashmool0/inama/services/notifications/internal/service"
 )
 
 type Worker interface {
@@ -26,16 +28,50 @@ type Broker struct {
 }
 
 type BrokerWorker struct {
-	broker *Broker
+	broker    *Broker
+	processor deliveryProcessor
 }
 
-func NewWorker(broker *Broker) *BrokerWorker {
-	return &BrokerWorker{broker: broker}
+type deliveryProcessor interface {
+	Process(ctx context.Context, body []byte) error
+}
+
+func NewWorker(broker *Broker, processor deliveryProcessor) *BrokerWorker {
+	return &BrokerWorker{broker: broker, processor: processor}
 }
 
 func (w *BrokerWorker) Run(ctx context.Context) error {
-	<-ctx.Done()
-	return ctx.Err()
+	deliveries, err := w.broker.channel.Consume(w.broker.queueName, "", false, false, false, false, nil)
+	if err != nil {
+		return fmt.Errorf("consume deliveries: %w", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case delivery, ok := <-deliveries:
+			if !ok {
+				return nil
+			}
+
+			err := w.processor.Process(ctx, delivery.Body)
+			switch {
+			case err == nil:
+				if ackErr := delivery.Ack(false); ackErr != nil {
+					return fmt.Errorf("ack delivery: %w", ackErr)
+				}
+			case service.IsRejectError(err):
+				if nackErr := delivery.Nack(false, false); nackErr != nil {
+					return fmt.Errorf("reject delivery: %w", nackErr)
+				}
+			default:
+				if nackErr := delivery.Nack(false, true); nackErr != nil {
+					return fmt.Errorf("requeue delivery: %w", nackErr)
+				}
+			}
+		}
+	}
 }
 
 func Connect(ctx context.Context, cfg Config) (*Broker, error) {

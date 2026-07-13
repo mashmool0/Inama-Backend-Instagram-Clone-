@@ -66,6 +66,18 @@ class TokenRepository:
             select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
         )
 
+    async def get_reset_for_user(
+        self, user_id: uuid.UUID, token_hash: str
+    ) -> PasswordResetToken | None:
+        """Scope the lookup by user so short reset codes can't collide across
+        accounts (the code alone isn't globally unique)."""
+        return await self._session.scalar(
+            select(PasswordResetToken).where(
+                PasswordResetToken.user_id == user_id,
+                PasswordResetToken.token_hash == token_hash,
+            )
+        )
+
     async def mark_used(self, token_hash: str) -> None:
         """Burn a reset token so it can't be used twice."""
         await self._session.execute(

@@ -5,15 +5,14 @@ and calls commit). It wires the repositories and the security services together;
 each of those stays single-purpose. Handlers (Step 4) call these methods and
 translate the results + domain errors to gRPC.
 
-Password reset (RequestPasswordReset/ResetPassword) is intentionally NOT here
-yet: the auth_db has no email column, so the email-based reset in the proto
-needs a design decision first (add email vs. reset via phone/SMS). See Step 4.
+Password reset is phone/SMS based: a short code is stored (hashed) in
+password_reset_tokens and sent by SMS, then submitted with the new password.
 """
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from app.clients import EmailClient, SmsClient
+from app.clients import SmsClient
 from app.config import Settings
 from app.errors import (
     AccountNotVerified,
@@ -28,7 +27,7 @@ from app.repositories.user_repo import UserRepository
 from app.services.jwt_service import JWTService
 from app.services.otp import OTPService
 from app.services.password import PasswordService
-from app.services.tokens import generate_token, hash_token
+from app.services.tokens import generate_numeric_code, generate_token, hash_token
 
 
 @dataclass
@@ -48,7 +47,6 @@ class AuthService:
         jwt: JWTService,
         otp: OTPService,
         sms: SmsClient,
-        email: EmailClient,
         settings: Settings,
     ):
         self._session = session
@@ -58,7 +56,6 @@ class AuthService:
         self._jwt = jwt
         self._otp = otp
         self._sms = sms
-        self._email = email
         self._settings = settings
 
     # ---------- flows ----------
@@ -117,6 +114,34 @@ class AuthService:
         pair = await self._issue_tokens(str(stored.user_id))
         await self._session.commit()
         return pair
+
+    async def request_password_reset(self, phone: str) -> None:
+        """Send a reset code by SMS. Silently succeeds for unknown phones so we
+        don't reveal which numbers are registered."""
+        user = await self._users.get_by_phone(phone)
+        if user is None:
+            return  # no user, but the handler still reports "sent"
+        code = generate_numeric_code()
+        expires_at = now_plus(self._settings.otp_ttl)
+        await self._tokens.add_reset(user.id, hash_token(code), expires_at)
+        await self._sms.send_reset_code(phone, code)
+        await self._session.commit()
+
+    async def reset_password(self, phone: str, code: str, new_password: str) -> None:
+        """Verify the reset code, set the new password, and invalidate all
+        existing sessions (refresh tokens) for safety."""
+        user = await self._users.get_by_phone(phone)
+        if user is None:
+            raise InvalidToken()
+        reset = await self._tokens.get_reset_for_user(user.id, hash_token(code))
+        now = datetime.now(timezone.utc)
+        if reset is None or reset.used or reset.expires_at <= now:
+            raise InvalidToken()
+
+        await self._users.update_password(user.id, self._passwords.hash(new_password))
+        await self._tokens.mark_used(hash_token(code))
+        await self._tokens.revoke_all_for_user(user.id)  # force re-login everywhere
+        await self._session.commit()
 
     # ---------- helpers ----------
 

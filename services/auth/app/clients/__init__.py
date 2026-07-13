@@ -1,8 +1,9 @@
-"""Outbound client contracts (SMS, email).
+"""Outbound client contracts (SMS).
 
-These are Protocols — the interface AuthService depends on. The concrete mock
-implementations (dev) land in Step 6. Depending on the interface keeps the
-business logic testable (inject a fake in tests).
+A Protocol — the interface AuthService depends on. The concrete mock
+implementation (dev) lands in Step 6. Depending on the interface keeps the
+business logic testable (inject a fake in tests). Everything is phone/SMS
+based, so there is no email client.
 """
 
 from typing import Protocol
@@ -11,6 +12,4 @@ from typing import Protocol
 class SmsClient(Protocol):
     async def send_otp(self, phone: str, code: str) -> None: ...
 
-
-class EmailClient(Protocol):
-    async def send_reset_link(self, email: str, token: str) -> None: ...
+    async def send_reset_code(self, phone: str, code: str) -> None: ...

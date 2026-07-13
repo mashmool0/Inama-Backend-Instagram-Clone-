@@ -12,22 +12,50 @@ import (
 	"syscall"
 	"time"
 
-	sharedconfig "github.com/mashmool0/inama/libs/config"
 	sharedidentity "github.com/mashmool0/inama/libs/identity"
 	sharedlogging "github.com/mashmool0/inama/libs/logging"
+	notifconfig "github.com/mashmool0/inama/services/notifications/internal/config"
 	notifgrpc "github.com/mashmool0/inama/services/notifications/internal/handler/grpc"
 	"github.com/mashmool0/inama/services/notifications/internal/queue"
+	"github.com/mashmool0/inama/services/notifications/internal/repository"
+	"github.com/mashmool0/inama/services/notifications/internal/schema"
 	"github.com/mashmool0/inama/services/notifications/internal/service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
 func main() {
-	cfg := sharedconfig.LoadBase("notifications")
+	cfg := notifconfig.Load()
 	logger := sharedlogging.New(cfg.ServiceName)
 
 	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	pool, err := repository.OpenPool(rootCtx, cfg.DatabaseURL)
+	if err != nil {
+		logger.Error("failed to connect to postgres", "error", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+
+	if cfg.AutoBootstrapSchema {
+		if err := schema.Bootstrap(rootCtx, pool); err != nil {
+			logger.Error("failed to bootstrap schema", "error", err)
+			os.Exit(1)
+		}
+	}
+
+	broker, err := queue.Connect(rootCtx, queue.Config{
+		URL:         cfg.RabbitMQURL,
+		Exchange:    cfg.RabbitMQExchange,
+		QueueName:   cfg.RabbitMQQueue,
+		RoutingKeys: cfg.RabbitMQRoutingKeys,
+	})
+	if err != nil {
+		logger.Error("failed to connect to rabbitmq", "error", err)
+		os.Exit(1)
+	}
+	defer broker.Close()
 
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(sharedidentity.UnaryServerInterceptor()),
@@ -57,7 +85,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	worker := queue.NoopWorker{}
+	worker := queue.NewWorker(broker)
 	errCh := make(chan error, 3)
 
 	go func() {

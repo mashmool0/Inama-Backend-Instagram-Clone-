@@ -1,2 +1,10 @@
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
+# Auth is an async gRPC service (not an HTTP API), so fastapi/uvicorn are gone.
+# A tiny health/metrics HTTP endpoint is added when the server is wired (Step 5).
+grpcio==1.68.0
+grpcio-tools==1.68.0
+sqlalchemy[asyncio]==2.0.36
+psycopg[binary]==3.2.3
+alembic==1.14.0
+bcrypt==4.2.1
+pyjwt[crypto]==2.10.1
+redis==5.2.1

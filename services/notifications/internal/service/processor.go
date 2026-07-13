@@ -31,16 +31,16 @@ type Processor struct {
 	pool            *pgxpool.Pool
 	notifications   notificationWriter
 	processedEvents processedEventWriter
-	pushClient      push.Client
+	pushDispatcher  push.Dispatcher
 	now             func() time.Time
 }
 
-func NewProcessor(pool *pgxpool.Pool, notifications notificationWriter, processedEvents processedEventWriter, pushClient push.Client) *Processor {
+func NewProcessor(pool *pgxpool.Pool, notifications notificationWriter, processedEvents processedEventWriter, pushDispatcher push.Dispatcher) *Processor {
 	return &Processor{
 		pool:            pool,
 		notifications:   notifications,
 		processedEvents: processedEvents,
-		pushClient:      pushClient,
+		pushDispatcher:  pushDispatcher,
 		now:             func() time.Time { return time.Now().UTC() },
 	}
 }
@@ -87,8 +87,8 @@ func (p *Processor) Process(ctx context.Context, body []byte) error {
 		return err
 	}
 
-	if err := p.pushClient.SendNotification(ctx, notification); err != nil {
-		return nil
+	if p.pushDispatcher != nil {
+		p.pushDispatcher.Dispatch(ctx, notification)
 	}
 
 	return nil

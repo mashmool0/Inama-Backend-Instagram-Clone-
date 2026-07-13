@@ -61,8 +61,13 @@ func main() {
 	notificationRepo := repository.NewNotificationRepository(pool)
 	processedEventRepo := repository.NewProcessedEventRepository(pool)
 	pushClient := push.NopClient{}
+	pushDispatcher := push.AsyncDispatcher{
+		Client:  pushClient,
+		Logger:  logger,
+		Timeout: 5 * time.Second,
+	}
 	readService := service.NewReadService(notificationRepo, cfg.DefaultPageLimit, cfg.MaxPageLimit)
-	processor := service.NewProcessor(pool, notificationRepo, processedEventRepo, pushClient)
+	processor := service.NewProcessor(pool, notificationRepo, processedEventRepo, pushDispatcher)
 
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(sharedidentity.UnaryServerInterceptor()),

@@ -56,17 +56,20 @@ message RefreshTokenRequest {
   string refresh_token = 1;
 }
 
+// Reset is phone/SMS based (the whole service is phone-based; auth_db has no
+// email). A short code is sent by SMS, then submitted with the new password.
 message RequestPasswordResetRequest {
-  string email = 1;
+  string phone = 1;
 }
 
 message RequestPasswordResetResponse {
-  bool email_sent = 1;
+  bool sent = 1; // always true — we don't reveal whether the phone exists
 }
 
 message ResetPasswordRequest {
-  string reset_token = 1;
-  string new_password = 2;
+  string phone = 1;
+  string code = 2;
+  string new_password = 3;
 }
 
 message ResetPasswordResponse {

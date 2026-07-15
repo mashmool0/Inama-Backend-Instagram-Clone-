@@ -26,9 +26,17 @@ services:
       PORT: "8080"
 
   auth:
-    build: ./services/auth
-    ports: ["8001:8000"]
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile
+    ports:
+      - "50051:50051"   # gRPC
     networks: [inama-net]
+    environment:
+      GRPC_PORT: "50051"
+      DATABASE_URL: "postgresql+psycopg://inama:inama@postgres:5432/auth_db"
+    depends_on:
+      - postgres
 
   user:
     build: ./services/user

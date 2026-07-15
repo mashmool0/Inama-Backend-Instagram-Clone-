@@ -6,23 +6,17 @@ option go_package = "github.com/mashmool0/inama/proto/gen/auth;authpb";
 
 // Conventions (see proto/README.md):
 //   - IDs are UUID strings.
-//   - Timestamps use google.protobuf.Timestamp.
-//   - Caller identity travels in gRPC metadata (x-user-id), NOT in messages.
-//     Auth is the exception: pre-login RPCs have no authenticated caller yet.
-//   - Errors use gRPC status codes.
+//   - Caller identity travels in gRPC metadata; Auth's pre-login RPCs are the
+//     exception (there is no authenticated caller yet).
 //
-// Auth signs JWTs with a private key; the Gateway verifies them locally with
-// the public key. There is deliberately no VerifyToken RPC on the hot path.
-
-import "google/protobuf/timestamp.proto";
+// Email + username based. Signup takes email/username/password and logs the
+// user in immediately (no verification step). Login accepts username OR email.
+// Auth signs JWTs with a private key; the Gateway verifies with the public key.
 
 service AuthService {
-  rpc Register(RegisterRequest) returns (RegisterResponse);
-  rpc VerifyOTP(VerifyOTPRequest) returns (TokenPair);
+  rpc Register(RegisterRequest) returns (TokenPair);
   rpc Login(LoginRequest) returns (TokenPair);
   rpc RefreshToken(RefreshTokenRequest) returns (TokenPair);
-  rpc RequestPasswordReset(RequestPasswordResetRequest) returns (RequestPasswordResetResponse);
-  rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
 }
 
 // Issued on successful auth. access_token is short-lived; refresh_token is long-lived.
@@ -33,45 +27,16 @@ message TokenPair {
 }
 
 message RegisterRequest {
-  string phone = 1;
-  string password = 2;
-}
-
-// Registration does not log you in — an OTP is sent to the phone first.
-message RegisterResponse {
-  bool otp_sent = 1;
-}
-
-message VerifyOTPRequest {
-  string phone = 1;
-  string code = 2;
+  string email = 1;
+  string username = 2;
+  string password = 3;
 }
 
 message LoginRequest {
-  string phone = 1; // login by phone for now; username login can be added later
+  string identifier = 1; // username OR email
   string password = 2;
 }
 
 message RefreshTokenRequest {
   string refresh_token = 1;
-}
-
-// Reset is phone/SMS based (the whole service is phone-based; auth_db has no
-// email). A short code is sent by SMS, then submitted with the new password.
-message RequestPasswordResetRequest {
-  string phone = 1;
-}
-
-message RequestPasswordResetResponse {
-  bool sent = 1; // always true — we don't reveal whether the phone exists
-}
-
-message ResetPasswordRequest {
-  string phone = 1;
-  string code = 2;
-  string new_password = 3;
-}
-
-message ResetPasswordResponse {
-  bool success = 1;
 }

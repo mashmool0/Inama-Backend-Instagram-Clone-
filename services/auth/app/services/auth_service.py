@@ -1,33 +1,29 @@
 """AuthService — orchestrates the auth flows.
 
-This is the only place that decides transaction boundaries (it owns the session
-and calls commit). It wires the repositories and the security services together;
-each of those stays single-purpose. Handlers (Step 4) call these methods and
-translate the results + domain errors to gRPC.
+The only place that owns transaction boundaries (calls commit). It wires the
+repositories and security services together; each of those stays single-purpose.
+Handlers translate the results + domain errors to gRPC.
 
-Password reset is phone/SMS based: a short code is stored (hashed) in
-password_reset_tokens and sent by SMS, then submitted with the new password.
+Email + username based, password login, no verification step. Signup logs the
+user in immediately and (later, via the Outbox) emits user.registered so the
+User service can create a profile.
 """
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from app.clients import SmsClient
 from app.config import Settings
 from app.errors import (
-    AccountNotVerified,
+    EmailAlreadyRegistered,
     InvalidCredentials,
-    InvalidOTP,
     InvalidToken,
-    PhoneAlreadyRegistered,
-    UserNotFound,
+    UsernameAlreadyTaken,
 )
 from app.repositories.token_repo import TokenRepository
 from app.repositories.user_repo import UserRepository
 from app.services.jwt_service import JWTService
-from app.services.otp import OTPService
 from app.services.password import PasswordService
-from app.services.tokens import generate_numeric_code, generate_token, hash_token
+from app.services.tokens import generate_token, hash_token
 
 
 @dataclass
@@ -45,8 +41,6 @@ class AuthService:
         tokens: TokenRepository,
         passwords: PasswordService,
         jwt: JWTService,
-        otp: OTPService,
-        sms: SmsClient,
         settings: Settings,
     ):
         self._session = session
@@ -54,57 +48,35 @@ class AuthService:
         self._tokens = tokens
         self._passwords = passwords
         self._jwt = jwt
-        self._otp = otp
-        self._sms = sms
         self._settings = settings
 
-    # ---------- flows ----------
+    async def register(self, email: str, username: str, password: str) -> TokenPair:
+        """Create the account and log the user in. Uniqueness of email and
+        username is checked up front (the DB constraints are the final guard)."""
+        if await self._users.get_by_email(email) is not None:
+            raise EmailAlreadyRegistered()
+        if await self._users.get_by_username(username) is not None:
+            raise UsernameAlreadyTaken()
 
-    async def register(self, phone: str, password: str) -> None:
-        """Create an unverified account and send an OTP. Registration does NOT
-        log the user in — they must verify the OTP first."""
-        existing = await self._users.get_by_phone(phone)
-        if existing is not None and existing.is_verified:
-            raise PhoneAlreadyRegistered(phone)
-
-        password_hash = self._passwords.hash(password)
-        if existing is None:
-            await self._users.create(phone, password_hash)
-        else:
-            # Re-registering an unverified number: refresh the stored password.
-            await self._users.update_password(existing.id, password_hash)
-
-        code = await self._otp.generate(phone)
-        await self._sms.send_otp(phone, code)
-        await self._session.commit()
-
-    async def verify_otp(self, phone: str, code: str) -> TokenPair:
-        """Verify the OTP, mark the account verified, and issue tokens."""
-        if not await self._otp.verify(phone, code):
-            raise InvalidOTP()
-        user = await self._users.get_by_phone(phone)
-        if user is None:
-            raise UserNotFound()
-        await self._users.mark_verified(user.id)
+        user = await self._users.create(email, username, self._passwords.hash(password))
         pair = await self._issue_tokens(str(user.id))
         await self._session.commit()
+        # TODO (Outbox step): emit user.registered {user_id, username} so the
+        # User service can create the profile.
         return pair
 
-    async def login(self, phone: str, password: str) -> TokenPair:
-        user = await self._users.get_by_phone(phone)
-        # Same error whether the phone is unknown or the password is wrong —
-        # don't reveal which phones exist.
+    async def login(self, identifier: str, password: str) -> TokenPair:
+        """Log in by username OR email + password."""
+        user = await self._users.get_by_identifier(identifier)
+        # Same error whether the identifier is unknown or the password is wrong.
         if user is None or not self._passwords.verify(password, user.password_hash):
             raise InvalidCredentials()
-        if not user.is_verified:
-            raise AccountNotVerified()
         pair = await self._issue_tokens(str(user.id))
         await self._session.commit()
         return pair
 
     async def refresh(self, refresh_token: str) -> TokenPair:
-        """Rotate the refresh token: verify it, revoke it, issue a fresh pair.
-        Rotation means a stolen-and-used token is detectable and short-lived."""
+        """Rotate the refresh token: verify it, revoke it, issue a fresh pair."""
         token_hash = hash_token(refresh_token)
         stored = await self._tokens.get_refresh(token_hash)
         now = datetime.now(timezone.utc)
@@ -115,49 +87,16 @@ class AuthService:
         await self._session.commit()
         return pair
 
-    async def request_password_reset(self, phone: str) -> None:
-        """Send a reset code by SMS. Silently succeeds for unknown phones so we
-        don't reveal which numbers are registered."""
-        user = await self._users.get_by_phone(phone)
-        if user is None:
-            return  # no user, but the handler still reports "sent"
-        code = generate_numeric_code()
-        expires_at = now_plus(self._settings.otp_ttl)
-        await self._tokens.add_reset(user.id, hash_token(code), expires_at)
-        await self._sms.send_reset_code(phone, code)
-        await self._session.commit()
-
-    async def reset_password(self, phone: str, code: str, new_password: str) -> None:
-        """Verify the reset code, set the new password, and invalidate all
-        existing sessions (refresh tokens) for safety."""
-        user = await self._users.get_by_phone(phone)
-        if user is None:
-            raise InvalidToken()
-        reset = await self._tokens.get_reset_for_user(user.id, hash_token(code))
-        now = datetime.now(timezone.utc)
-        if reset is None or reset.used or reset.expires_at <= now:
-            raise InvalidToken()
-
-        await self._users.update_password(user.id, self._passwords.hash(new_password))
-        await self._tokens.mark_used(hash_token(code))
-        await self._tokens.revoke_all_for_user(user.id)  # force re-login everywhere
-        await self._session.commit()
-
-    # ---------- helpers ----------
-
     async def _issue_tokens(self, user_id: str) -> TokenPair:
-        """Issue a short-lived access JWT + a stored (hashed) opaque refresh
-        token. Shared by verify_otp, login, and refresh."""
+        """Issue a short-lived access JWT + a stored (hashed) opaque refresh token."""
         access = self._jwt.issue_access(user_id)
         raw_refresh = generate_token()
-        expires_at = now_plus(self._settings.refresh_token_ttl)
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            seconds=self._settings.refresh_token_ttl
+        )
         await self._tokens.add_refresh(user_id, hash_token(raw_refresh), expires_at)
         return TokenPair(
             access_token=access,
             refresh_token=raw_refresh,
             expires_in=self._settings.access_token_ttl,
         )
-
-
-def now_plus(seconds: int) -> datetime:
-    return datetime.now(timezone.utc) + timedelta(seconds=seconds)

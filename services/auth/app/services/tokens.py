@@ -15,11 +15,6 @@ def generate_token(nbytes: int = 32) -> str:
     return secrets.token_urlsafe(nbytes)
 
 
-def generate_numeric_code(length: int = 6) -> str:
-    """A short numeric code suitable for SMS (e.g. password-reset code)."""
-    return "".join(secrets.choice("0123456789") for _ in range(length))
-
-
 def hash_token(token: str) -> str:
     """SHA-256 hex digest — what we store in the DB (never the raw token)."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()

@@ -1,14 +1,12 @@
 """Database access for the users table.
 
-Rules for this layer:
-  - DB access ONLY — no password hashing, no token logic, no business rules.
-  - No commits. Repositories `flush` when they need a generated id, but the
-    SERVICE layer decides when to commit/rollback (transaction boundaries).
+DB access ONLY — no password hashing, no business rules, no commits. The
+service layer owns transaction boundaries.
 """
 
 import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
@@ -18,29 +16,23 @@ class UserRepository:
     def __init__(self, session: AsyncSession):
         self._session = session
 
-    async def create(self, phone: str, password_hash: str) -> User:
-        """Insert a new (unverified) user. Flush to populate the generated id
-        and defaults, but do not commit."""
-        user = User(phone=phone, password_hash=password_hash)
+    async def create(self, email: str, username: str, password_hash: str) -> User:
+        user = User(email=email, username=username, password_hash=password_hash)
         self._session.add(user)
-        await self._session.flush()
+        await self._session.flush()  # populate id, without committing
         return user
 
-    async def get_by_phone(self, phone: str) -> User | None:
-        """Used by login and by the register flow's duplicate check."""
-        return await self._session.scalar(select(User).where(User.phone == phone))
+    async def get_by_email(self, email: str) -> User | None:
+        return await self._session.scalar(select(User).where(User.email == email))
+
+    async def get_by_username(self, username: str) -> User | None:
+        return await self._session.scalar(select(User).where(User.username == username))
+
+    async def get_by_identifier(self, identifier: str) -> User | None:
+        """Resolve a login identifier that may be either an email or a username."""
+        return await self._session.scalar(
+            select(User).where(or_(User.email == identifier, User.username == identifier))
+        )
 
     async def get_by_id(self, user_id: uuid.UUID) -> User | None:
         return await self._session.get(User, user_id)
-
-    async def mark_verified(self, user_id: uuid.UUID) -> None:
-        """Flip is_verified to true after a successful OTP verification."""
-        await self._session.execute(
-            update(User).where(User.id == user_id).values(is_verified=True)
-        )
-
-    async def update_password(self, user_id: uuid.UUID, password_hash: str) -> None:
-        """Set a new password hash (used by the reset-password flow)."""
-        await self._session.execute(
-            update(User).where(User.id == user_id).values(password_hash=password_hash)
-        )

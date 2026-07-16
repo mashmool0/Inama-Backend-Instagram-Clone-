@@ -1,7 +1,8 @@
-# Auth is an async gRPC service. A tiny health/metrics HTTP endpoint is added
-# when the server is wired (Step 5).
-grpcio==1.68.0
-grpcio-tools==1.68.0
+# Auth is an async gRPC service. grpcio + protobuf must match the version the
+# generated stubs (proto/gen) were built with by `make gen` (protobuf 7.35.1).
+# grpcio-tools is NOT needed at runtime (code is generated via `make gen`).
+grpcio==1.82.1
+protobuf==7.35.1
 sqlalchemy[asyncio]==2.0.36
 psycopg[binary]==3.2.3
 alembic==1.14.0

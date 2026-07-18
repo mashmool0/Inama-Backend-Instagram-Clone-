@@ -38,6 +38,32 @@ services:
     depends_on:
       - postgres
 
+  # Relay: reads the auth_db outbox table and publishes events to RabbitMQ.
+  auth-outbox-relay:
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile
+    command: ["python", "-m", "app.workers.outbox_relay"]
+    networks: [inama-net]
+    environment:
+      DATABASE_URL: "postgresql+psycopg://inama:inama@postgres:5432/auth_db"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+    depends_on:
+      - postgres
+      - rabbitmq
+
+  # Consumer: fakes sending a welcome email on user.registered.
+  auth-email-worker:
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile
+    command: ["python", "-m", "app.workers.email_worker"]
+    networks: [inama-net]
+    environment:
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+    depends_on:
+      - rabbitmq
+
   user:
     build: ./services/user
     ports: ["8082:8080"]
@@ -89,6 +115,15 @@ services:
     ports: ["6379:6379"]
     networks: [inama-net]
 
+  # The system's single message broker. Management UI at http://localhost:15672
+  # (guest/guest). All services that need async messaging connect to this one.
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"     # AMQP (services connect here)
+      - "15672:15672"   # management web UI
+    networks: [inama-net]
+
   prometheus:
     image: prom/prometheus:latest
     ports: ["9090:9090"]
@@ -103,11 +138,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
 
-  # ---------- TBD — uncomment once decided (CLAUDE.md open decisions) ----------
-  # Message broker: Kafka vs RabbitMQ is NOT decided yet. Needed by Phase 2.
-  # broker:
-  #   image: ...
-
+  # ---------- Not running yet ----------
   # Elasticsearch: needed by Search in Phase 3, heavy to run — off until then.
   # elasticsearch:
   #   image: docker.elastic.co/elasticsearch/elasticsearch:8.x

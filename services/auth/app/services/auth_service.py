@@ -19,11 +19,14 @@ from app.errors import (
     InvalidToken,
     UsernameAlreadyTaken,
 )
+from app.repositories.outbox_repo import OutboxRepository
 from app.repositories.token_repo import TokenRepository
 from app.repositories.user_repo import UserRepository
 from app.services.jwt_service import JWTService
 from app.services.password import PasswordService
 from app.services.tokens import generate_token, hash_token
+
+USER_REGISTERED = "user.registered"
 
 
 @dataclass
@@ -39,6 +42,7 @@ class AuthService:
         session,
         users: UserRepository,
         tokens: TokenRepository,
+        outbox: OutboxRepository,
         passwords: PasswordService,
         jwt: JWTService,
         settings: Settings,
@@ -46,6 +50,7 @@ class AuthService:
         self._session = session
         self._users = users
         self._tokens = tokens
+        self._outbox = outbox
         self._passwords = passwords
         self._jwt = jwt
         self._settings = settings
@@ -59,10 +64,15 @@ class AuthService:
             raise UsernameAlreadyTaken()
 
         user = await self._users.create(email, username, self._passwords.hash(password))
+        # Written in the SAME transaction as the user — atomic. A relay worker
+        # publishes it to RabbitMQ; a consumer "sends" the welcome email, and
+        # (later) the User service creates the profile.
+        await self._outbox.add(
+            USER_REGISTERED,
+            {"user_id": str(user.id), "email": email, "username": username},
+        )
         pair = await self._issue_tokens(str(user.id))
         await self._session.commit()
-        # TODO (Outbox step): emit user.registered {user_id, username} so the
-        # User service can create the profile.
         return pair
 
     async def login(self, identifier: str, password: str) -> TokenPair:

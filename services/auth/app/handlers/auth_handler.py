@@ -19,6 +19,7 @@ from app.errors import (
     InvalidToken,
     UsernameAlreadyTaken,
 )
+from app.repositories.outbox_repo import OutboxRepository
 from app.repositories.token_repo import TokenRepository
 from app.repositories.user_repo import UserRepository
 from app.services.auth_service import AuthService, TokenPair
@@ -60,6 +61,7 @@ class AuthHandler(auth_pb2_grpc.AuthServiceServicer):
             session=session,
             users=UserRepository(session),
             tokens=TokenRepository(session),
+            outbox=OutboxRepository(session),
             passwords=self._passwords,
             jwt=self._jwt,
             settings=self._settings,

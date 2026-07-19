@@ -109,11 +109,22 @@ services:
       - rabbitmq
 
   user:
-    build: ./services/user
-    ports: ["8082:8080"]
+    build:
+      context: .
+      dockerfile: services/user/Dockerfile
+    ports:
+      - "8082:8080"
+      - "50052:50051"
     networks: [inama-net]
     environment:
-      PORT: "8080"
+      GRPC_PORT: "50051"
+      METRICS_PORT: "8080"
+      DATABASE_URL: "postgres://inama:inama@postgres:5432/user_db?sslmode=disable"
+      AUTO_BOOTSTRAP_SCHEMA: "true"
+      DEFAULT_PAGE_LIMIT: "20"
+      MAX_PAGE_LIMIT: "100"
+    depends_on:
+      - postgres
 
   posts:
     build: ./services/posts
@@ -130,11 +141,27 @@ services:
       PORT: "8080"
 
   notifications:
-    build: ./services/notifications
-    ports: ["8085:8080"]
+    build:
+      context: .
+      dockerfile: services/notifications/Dockerfile
+    ports:
+      - "8085:8080"
+      - "50055:50051"
     networks: [inama-net]
     environment:
-      PORT: "8080"
+      GRPC_PORT: "50051"
+      METRICS_PORT: "8080"
+      DATABASE_URL: "postgres://inama:inama@postgres:5432/notif_db?sslmode=disable"
+      AUTO_BOOTSTRAP_SCHEMA: "true"
+      DEFAULT_PAGE_LIMIT: "20"
+      MAX_PAGE_LIMIT: "100"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+      RABBITMQ_EXCHANGE: "inama.events"
+      RABBITMQ_QUEUE: "notif.q"
+      RABBITMQ_ROUTING_KEYS: "post.liked,comment.created,user.followed"
+    depends_on:
+      - postgres
+      - rabbitmq
 
   search:
     build: ./services/search

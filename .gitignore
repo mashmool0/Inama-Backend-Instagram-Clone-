@@ -30,6 +30,10 @@ go.work
 go.work.sum
 # compiled service binaries (named after their dir by `go build`)
 /services/gateway/gateway
+/services/feed/feed
+/services/posts/posts
+/services/user/user
+/services/notifications/notifications
 
 
 # ── Python ──────────────────────────────────

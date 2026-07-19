@@ -15,15 +15,32 @@ networks:
 
 volumes:
   postgres-data:
+  auth-keys:   # RS256 keypair: auth writes it, gateway reads the public half
 
 services:
   # ---------- Application services ----------
   gateway:
-    build: ./services/gateway
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
     ports: ["8080:8080"]
     networks: [inama-net]
     environment:
       PORT: "8080"
+      JWT_PUBLIC_KEY_PATH: "/keys/jwt_public.pem"
+      REDIS_ADDR: "redis:6379"
+      RATE_LIMIT_RPS: "100"
+      AUTH_ADDR: "auth:50051"
+      USER_ADDR: "user:50051"
+      POSTS_ADDR: "posts:50051"
+      FEED_ADDR: "feed:50051"
+      NOTIF_ADDR: "notifications:50051"
+      SEARCH_ADDR: "search:50051"
+    volumes:
+      - auth-keys:/keys:ro   # read-only; auth is the only writer
+    depends_on:
+      - auth
+      - redis
 
   auth:
     build:
@@ -35,6 +52,10 @@ services:
     environment:
       GRPC_PORT: "50051"
       DATABASE_URL: "postgresql+psycopg://inama:inama@postgres:5432/auth_db"
+      JWT_PRIVATE_KEY_PATH: "/app/keys/jwt_private.pem"
+      JWT_PUBLIC_KEY_PATH: "/app/keys/jwt_public.pem"
+    volumes:
+      - auth-keys:/app/keys   # generate_keys.py writes here on startup
     depends_on:
       - postgres
 
@@ -47,6 +68,22 @@ services:
     networks: [inama-net]
     environment:
       DATABASE_URL: "postgresql+psycopg://inama:inama@postgres:5432/auth_db"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+    depends_on:
+      - postgres
+      - rabbitmq
+
+  # One-off test runner. Not started by `docker compose up` (test profile).
+  # Run the full Auth suite in a container against postgres + rabbitmq:
+  #   docker compose --profile test run --rm auth-tests
+  auth-tests:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile.test
+    networks: [inama-net]
+    environment:
+      TEST_PG_BASE: "inama:inama@postgres:5432"
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
     depends_on:
       - postgres

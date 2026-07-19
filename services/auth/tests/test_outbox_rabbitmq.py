@@ -4,6 +4,7 @@ Requires RabbitMQ to be reachable on localhost:5672 (skips otherwise).
 """
 
 import json
+import os
 
 import aio_pika
 import pytest
@@ -16,7 +17,9 @@ from app.models import OutboxEvent
 from app.repositories.outbox_repo import OutboxRepository
 from app.workers.outbox_relay import publish_pending
 
-RABBIT_URL = "amqp://guest:guest@localhost:5672/"
+# localhost for host runs; set RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+# when running inside the docker network.
+RABBIT_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 
 
 @pytest_asyncio.fixture

@@ -1,0 +1,15 @@
+# Runs the Auth test suite inside a container (see the `auth-tests` service in
+# docker-compose.yml). Build context is the repo root so it can copy proto/gen.
+FROM python:3.12-slim
+WORKDIR /app
+
+COPY services/auth/requirements.txt services/auth/requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+COPY services/auth/ /app/
+COPY proto/gen/ /app/gen/
+
+# /app → app package + tests; /app/gen → generated `auth` package
+ENV PYTHONPATH=/app:/app/gen
+
+CMD ["pytest", "-v"]

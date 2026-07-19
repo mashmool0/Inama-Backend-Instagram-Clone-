@@ -21,6 +21,21 @@ from app.repositories.outbox_repo import OutboxRepository
 POLL_INTERVAL_SECONDS = 1.0
 
 
+async def publish_pending(session, exchange) -> int:
+    """Publish all unpublished outbox rows to the exchange and mark them
+    published. Returns how many were relayed. Caller commits the session."""
+    repo = OutboxRepository(session)
+    events = await repo.get_unpublished(limit=100)
+    for event in events:
+        body = json.dumps({"event_type": event.event_type, "data": event.payload}).encode()
+        await exchange.publish(
+            aio_pika.Message(body=body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT),
+            routing_key=event.event_type,
+        )
+        await repo.mark_published(event.id)
+    return len(events)
+
+
 async def run() -> None:
     rabbit_url = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
     connection = await aio_pika.connect_robust(rabbit_url)
@@ -33,22 +48,10 @@ async def run() -> None:
     while True:
         try:
             async with SessionLocal() as session:
-                repo = OutboxRepository(session)
-                events = await repo.get_unpublished(limit=100)
-                for event in events:
-                    body = json.dumps(
-                        {"event_type": event.event_type, "data": event.payload}
-                    ).encode()
-                    await exchange.publish(
-                        aio_pika.Message(
-                            body=body,
-                            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-                        ),
-                        routing_key=event.event_type,
-                    )
-                    await repo.mark_published(event.id)
-                    print(f"relayed {event.event_type} ({event.id})", flush=True)
+                count = await publish_pending(session, exchange)
                 await session.commit()
+                if count:
+                    print(f"relayed {count} event(s)", flush=True)
         except Exception as exc:  # keep the worker alive across transient errors
             print(f"relay error (will retry): {exc}", flush=True)
         await asyncio.sleep(POLL_INTERVAL_SECONDS)

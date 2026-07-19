@@ -38,6 +38,10 @@ services:
       SEARCH_ADDR: "search:50051"
     volumes:
       - auth-keys:/keys:ro   # read-only; auth is the only writer
+    # depends_on only waits for auth to START, not for it to have written the
+    # shared key. restart makes the boot race non-fatal: if the gateway gives up
+    # waiting for the key, it comes back and finds it on the next try.
+    restart: unless-stopped
     depends_on:
       - auth
       - redis
@@ -56,6 +60,9 @@ services:
       JWT_PUBLIC_KEY_PATH: "/app/keys/jwt_public.pem"
     volumes:
       - auth-keys:/app/keys   # generate_keys.py writes here on startup
+    # Postgres may not accept connections the instant auth boots; restart lets
+    # auth retry the migration step instead of dying on a cold start.
+    restart: unless-stopped
     depends_on:
       - postgres
 

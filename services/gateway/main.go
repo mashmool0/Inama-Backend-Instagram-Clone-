@@ -81,11 +81,13 @@ func main() {
 	}
 }
 
-// loadPublicKey reads Auth's RS256 public key from disk. Because the gateway may
-// boot before Auth has generated the shared key, it retries briefly before
-// giving up.
+// loadPublicKey reads Auth's RS256 public key from disk. On a cold start the
+// gateway boots before Auth has waited for Postgres, generated the shared key,
+// and run migrations — which takes well over 20s on an empty volume — so it
+// retries for up to two minutes before giving up. Paired with a restart policy
+// in compose, this makes the boot race non-fatal.
 func loadPublicKey(log logger, path string) *rsa.PublicKey {
-	for attempt := 1; attempt <= 10; attempt++ {
+	for attempt := 1; attempt <= 60; attempt++ {
 		pem, err := os.ReadFile(path)
 		if err == nil {
 			key, perr := jwt.ParseRSAPublicKeyFromPEM(pem)

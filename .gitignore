@@ -28,6 +28,8 @@ dist/
 vendor/
 go.work
 go.work.sum
+# compiled service binaries (named after their dir by `go build`)
+/services/gateway/gateway
 
 
 # ── Python ──────────────────────────────────

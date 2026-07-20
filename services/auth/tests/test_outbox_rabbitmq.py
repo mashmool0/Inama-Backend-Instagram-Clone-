@@ -61,7 +61,9 @@ async def test_relay_publishes_outbox_event_and_marks_it_published(rabbit_channe
     message = await queue.get(timeout=5)
     body = json.loads(message.body)
     await message.ack()
+    assert body["event_id"]
     assert body["event_type"] == "user.registered"
+    assert body["occurred_at"]
     assert body["data"]["email"] == "r@x.com"
     assert body["data"]["username"] == "ru"
 

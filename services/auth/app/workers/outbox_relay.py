@@ -27,7 +27,14 @@ async def publish_pending(session, exchange) -> int:
     repo = OutboxRepository(session)
     events = await repo.get_unpublished(limit=100)
     for event in events:
-        body = json.dumps({"event_type": event.event_type, "data": event.payload}).encode()
+        body = json.dumps(
+            {
+                "event_id": str(event.id),
+                "event_type": event.event_type,
+                "occurred_at": event.created_at.isoformat(),
+                "data": event.payload,
+            }
+        ).encode()
         await exchange.publish(
             aio_pika.Message(body=body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT),
             routing_key=event.event_type,

@@ -12,9 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	usergrpc "github.com/mashmool0/inama/services/user/internal/handler/grpc"
 	userconfig "github.com/mashmool0/inama/services/user/internal/config"
 	userevents "github.com/mashmool0/inama/services/user/internal/events"
+	usergrpc "github.com/mashmool0/inama/services/user/internal/handler/grpc"
+	"github.com/mashmool0/inama/services/user/internal/queue"
 	"github.com/mashmool0/inama/services/user/internal/repository"
 	"github.com/mashmool0/inama/services/user/internal/schema"
 	"github.com/mashmool0/inama/services/user/internal/service"
@@ -46,11 +47,26 @@ func main() {
 		}
 	}
 
+	broker, err := queue.Connect(rootCtx, queue.Config{
+		URL:         cfg.RabbitMQURL,
+		Exchange:    cfg.RabbitMQExchange,
+		QueueName:   cfg.RabbitMQQueue,
+		RoutingKeys: []string{userevents.EventTypeUserRegistered, userevents.EventTypeUsernameUpdated},
+	})
+	if err != nil {
+		logger.Error("failed to connect to rabbitmq", "error", err)
+		os.Exit(1)
+	}
+	defer broker.Close()
+
 	userRepo := repository.NewUserRepository(pool)
 	followRepo := repository.NewFollowRepository(pool)
+	profileSyncRepo := repository.NewProfileSyncRepository(pool)
 	publisher := userevents.NopPublisher{}
 	profileService := service.NewProfileService(userRepo, publisher)
 	followService := service.NewFollowService(pool, userRepo, followRepo, publisher, cfg.DefaultPageLimit, cfg.MaxPageLimit)
+	profileSyncProcessor := service.NewProfileSyncProcessor(pool, profileSyncRepo)
+	profileSyncWorker := queue.NewWorker(broker, profileSyncProcessor)
 
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(sharedidentity.UnaryServerInterceptor()),
@@ -80,7 +96,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	errCh := make(chan error, 2)
+	errCh := make(chan error, 3)
 
 	go func() {
 		logger.Info("starting gRPC server", "port", cfg.GRPCPort)
@@ -93,6 +109,13 @@ func main() {
 		logger.Info("starting HTTP server", "port", cfg.MetricsPort)
 		if serveErr := httpServer.ListenAndServe(); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
 			errCh <- serveErr
+		}
+	}()
+
+	go func() {
+		logger.Info("starting profile sync worker")
+		if workerErr := profileSyncWorker.Run(rootCtx); workerErr != nil && !errors.Is(workerErr, context.Canceled) {
+			errCh <- workerErr
 		}
 	}()
 

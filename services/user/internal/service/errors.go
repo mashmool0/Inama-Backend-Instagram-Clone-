@@ -7,6 +7,7 @@ var (
 	ErrNotFound        = errors.New("not found")
 	ErrAlreadyExists   = errors.New("already exists")
 	ErrInvalidCursor   = errors.New("invalid cursor")
+	ErrRejectMessage   = errors.New("reject message")
 )
 
 type InvalidArgumentError struct {

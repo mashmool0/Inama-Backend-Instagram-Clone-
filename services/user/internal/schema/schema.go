@@ -32,6 +32,13 @@ CREATE TABLE IF NOT EXISTS follows (
 `,
 	`CREATE INDEX IF NOT EXISTS idx_follows_followee_created_follower ON follows (followee_id, created_at DESC, follower_id DESC)`,
 	`CREATE INDEX IF NOT EXISTS idx_follows_follower_created_followee ON follows (follower_id, created_at DESC, followee_id DESC)`,
+	`
+CREATE TABLE IF NOT EXISTS processed_events (
+    event_id UUID PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)
+`,
 }
 
 func Bootstrap(ctx context.Context, pool *pgxpool.Pool) error {

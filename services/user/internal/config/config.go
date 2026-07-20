@@ -11,6 +11,9 @@ type Config struct {
 	DefaultPageLimit    int32
 	MaxPageLimit        int32
 	AutoBootstrapSchema bool
+	RabbitMQURL         string
+	RabbitMQExchange    string
+	RabbitMQQueue       string
 }
 
 func Load() Config {
@@ -29,6 +32,9 @@ func Load() Config {
 		DefaultPageLimit:    defaultLimit,
 		MaxPageLimit:        maxLimit,
 		AutoBootstrapSchema: sharedconfig.GetBool("AUTO_BOOTSTRAP_SCHEMA", true),
+		RabbitMQURL:         sharedconfig.Get("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/"),
+		RabbitMQExchange:    sharedconfig.Get("RABBITMQ_EXCHANGE", "inama.events"),
+		RabbitMQQueue:       sharedconfig.Get("RABBITMQ_QUEUE", "user.profile-sync.q"),
 	}
 }
 

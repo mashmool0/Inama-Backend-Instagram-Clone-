@@ -123,8 +123,19 @@ services:
       AUTO_BOOTSTRAP_SCHEMA: "true"
       DEFAULT_PAGE_LIMIT: "20"
       MAX_PAGE_LIMIT: "100"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+      RABBITMQ_EXCHANGE: "inama.events"
+      RABBITMQ_QUEUE: "user.profile-sync.q"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   posts:
     build: ./services/posts
@@ -160,8 +171,15 @@ services:
       RABBITMQ_QUEUE: "notif.q"
       RABBITMQ_ROUTING_KEYS: "post.liked,comment.created,user.followed"
     depends_on:
-      - postgres
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   search:
     build: ./services/search
@@ -180,6 +198,11 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inama -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
 
   redis:
     image: redis:7-alpine
@@ -194,6 +217,11 @@ services:
       - "5672:5672"     # AMQP (services connect here)
       - "15672:15672"   # management web UI
     networks: [inama-net]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
 
   prometheus:
     image: prom/prometheus:latest

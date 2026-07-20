@@ -1,5 +1,5 @@
 # Multi-stage build — small final image, no Go toolchain shipped.
-FROM golang:1.23-alpine AS build
+FROM golang:1.25-alpine AS build
 WORKDIR /src
 
 COPY services/notifications/go.mod services/notifications/go.sum ./services/notifications/

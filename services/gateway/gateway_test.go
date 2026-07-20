@@ -282,6 +282,14 @@ func TestGatewayErrorMappingAndCORS(t *testing.T) {
 	if recorder.Header().Get("Access-Control-Allow-Origin") != "http://localhost:3000" {
 		t.Fatal("normal response is missing CORS origin")
 	}
+
+	request = httptest.NewRequest(http.MethodOptions, "/auth/register", nil)
+	request.Header.Set("Origin", "http://localhost:3001")
+	recorder = httptest.NewRecorder()
+	cors([]string{"http://localhost:3000", "http://localhost:3001"}, http.NewServeMux()).ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusNoContent || recorder.Header().Get("Access-Control-Allow-Origin") != "http://localhost:3001" {
+		t.Fatalf("secondary dev origin status=%d origin=%q", recorder.Code, recorder.Header().Get("Access-Control-Allow-Origin"))
+	}
 }
 
 func performRequest(handler http.Handler, method, path, body, token string) *httptest.ResponseRecorder {

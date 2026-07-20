@@ -21,6 +21,10 @@ class InvalidUsername(AuthError):
     pass
 
 
+class InvalidRegistration(AuthError):
+    pass
+
+
 class UserNotFound(AuthError):
     pass
 

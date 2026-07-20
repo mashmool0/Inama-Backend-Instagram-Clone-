@@ -20,6 +20,7 @@ from app.config import Settings
 from app.errors import (
     EmailAlreadyRegistered,
     InvalidCredentials,
+    InvalidRegistration,
     InvalidToken,
     InvalidUsername,
     UserNotFound,
@@ -35,6 +36,7 @@ from app.services.tokens import generate_token, hash_token
 USER_REGISTERED = "user.registered"
 USER_USERNAME_UPDATED = "user.username_updated"
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9._]+$")
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 @dataclass
@@ -66,6 +68,15 @@ class AuthService:
     async def register(self, email: str, username: str, password: str) -> TokenPair:
         """Create the account and log the user in. Uniqueness of email and
         username is checked up front (the DB constraints are the final guard)."""
+        email = email.strip().lower()
+        username = username.strip()
+        if not email or len(email) > 255 or EMAIL_PATTERN.fullmatch(email) is None:
+            raise InvalidRegistration()
+        if not 3 <= len(username) <= 50 or USERNAME_PATTERN.fullmatch(username) is None:
+            raise InvalidUsername()
+        if not password:
+            raise InvalidRegistration()
+
         if await self._users.get_by_email(email) is not None:
             raise EmailAlreadyRegistered()
         if await self._users.get_by_username(username) is not None:

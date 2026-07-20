@@ -13,6 +13,7 @@ from app.db import SessionLocal
 from app.errors import (
     EmailAlreadyRegistered,
     InvalidCredentials,
+    InvalidRegistration,
     InvalidToken,
     InvalidUsername,
     UserNotFound,
@@ -90,6 +91,20 @@ async def test_register_duplicate_username_rejected():
     await _register("a@x.com", "sameuser", "pw")
     with pytest.raises(UsernameAlreadyTaken):
         await _register("b@x.com", "sameuser", "pw")
+
+
+@pytest.mark.parametrize(
+    ("email", "username", "password", "error"),
+    [
+        ("", "valid_user", "pw", InvalidRegistration),
+        ("not-an-email", "valid_user", "pw", InvalidRegistration),
+        ("user@example.com", "bad username", "pw", InvalidUsername),
+        ("user@example.com", "valid_user", "", InvalidRegistration),
+    ],
+)
+async def test_register_rejects_invalid_required_fields(email, username, password, error):
+    with pytest.raises(error):
+        await _register(email, username, password)
 
 
 # ---------- login ----------

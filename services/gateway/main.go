@@ -74,7 +74,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	registerRoutes(mux, c, rdb, rateLimit, pubKey)
-	handler := cors(strings.Split(config.Get("CORS_ALLOWED_ORIGINS", "http://localhost:3000"), ","), mux)
+	handler := cors(strings.Split(config.Get("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001"), ","), mux)
 
 	log.Info("gateway listening", "port", port)
 	if err := http.ListenAndServe(":"+port, handler); err != nil {

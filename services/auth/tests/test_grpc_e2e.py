@@ -33,11 +33,11 @@ async def stub():
 
 async def test_register_then_login_then_refresh(stub):
     reg = await stub.Register(
-        auth_pb2.RegisterRequest(email="g@x.com", username="ge", password="pw123")
+        auth_pb2.RegisterRequest(email="g@x.com", username="geo", password="pw123")
     )
     assert reg.access_token and reg.refresh_token and reg.expires_in > 0
 
-    login = await stub.Login(auth_pb2.LoginRequest(identifier="ge", password="pw123"))
+    login = await stub.Login(auth_pb2.LoginRequest(identifier="geo", password="pw123"))
     assert login.access_token
 
     refreshed = await stub.RefreshToken(
@@ -47,14 +47,20 @@ async def test_register_then_login_then_refresh(stub):
 
 
 async def test_duplicate_email_maps_to_already_exists(stub):
-    await stub.Register(auth_pb2.RegisterRequest(email="d@x.com", username="d1", password="pw"))
+    await stub.Register(auth_pb2.RegisterRequest(email="d@x.com", username="dup", password="pw"))
     with pytest.raises(grpc.aio.AioRpcError) as err:
-        await stub.Register(auth_pb2.RegisterRequest(email="d@x.com", username="d2", password="pw"))
+        await stub.Register(auth_pb2.RegisterRequest(email="d@x.com", username="dupe", password="pw"))
     assert err.value.code() == grpc.StatusCode.ALREADY_EXISTS
 
 
+async def test_empty_registration_maps_to_invalid_argument(stub):
+    with pytest.raises(grpc.aio.AioRpcError) as err:
+        await stub.Register(auth_pb2.RegisterRequest())
+    assert err.value.code() == grpc.StatusCode.INVALID_ARGUMENT
+
+
 async def test_wrong_password_maps_to_unauthenticated(stub):
-    await stub.Register(auth_pb2.RegisterRequest(email="w@x.com", username="w1", password="right"))
+    await stub.Register(auth_pb2.RegisterRequest(email="w@x.com", username="wrong", password="right"))
     with pytest.raises(grpc.aio.AioRpcError) as err:
         await stub.Login(auth_pb2.LoginRequest(identifier="w@x.com", password="wrong"))
     assert err.value.code() == grpc.StatusCode.UNAUTHENTICATED

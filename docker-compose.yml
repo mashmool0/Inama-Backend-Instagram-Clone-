@@ -30,7 +30,8 @@ services:
       JWT_PUBLIC_KEY_PATH: "/keys/jwt_public.pem"
       REDIS_ADDR: "redis:6379"
       RATE_LIMIT_RPS: "100"
-      CORS_ALLOWED_ORIGINS: "http://localhost:3000"
+      # Next uses 3000 by default and falls back to 3001 when that port is in use.
+      CORS_ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:3001"
       AUTH_ADDR: "auth:50051"
       USER_ADDR: "user:50051"
       POSTS_ADDR: "posts:50051"

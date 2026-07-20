@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package inama.posts.v1;
+
+option go_package = "github.com/mashmool0/inama/proto/gen/posts;postspb";
+
+// Conventions: UUID string IDs, google.protobuf.Timestamp, caller (author /
+// liker / commenter) comes from gRPC metadata (x-user-id), never a message field.
+
+import "google/protobuf/timestamp.proto";
+
+service PostsService {
+  rpc CreatePost(CreatePostRequest) returns (Post);
+  rpc DeletePost(DeletePostRequest) returns (DeletePostResponse);
+  rpc GetPost(GetPostRequest) returns (Post);
+
+  rpc LikePost(LikePostRequest) returns (LikeResponse);
+  rpc UnlikePost(UnlikePostRequest) returns (LikeResponse);
+
+  rpc AddComment(AddCommentRequest) returns (Comment);
+  rpc GetComments(GetCommentsRequest) returns (CommentPage);
+}
+
+message Post {
+  string id = 1;
+  string author_id = 2;
+  string caption = 3;
+  string media_url = 4; // empty for text-only posts
+  int64 like_count = 5;
+  int64 comment_count = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message Comment {
+  string id = 1;
+  string post_id = 2;
+  string author_id = 3;
+  string body = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+// Author = x-user-id from metadata. Exactly one of caption/media_url may be empty,
+// but not both (photo/video OR text — see docs/01-architecture-overview.md).
+message CreatePostRequest {
+  string caption = 1;
+  string media_url = 2;
+}
+
+message DeletePostRequest {
+  string post_id = 1;
+}
+message DeletePostResponse { bool success = 1; }
+
+message GetPostRequest {
+  string post_id = 1;
+}
+
+message LikePostRequest {
+  string post_id = 1;
+}
+message UnlikePostRequest {
+  string post_id = 1;
+}
+message LikeResponse {
+  int64 like_count = 1; // current count after the operation
+}
+
+message AddCommentRequest {
+  string post_id = 1;
+  string body = 2;
+}
+
+message GetCommentsRequest {
+  string post_id = 1;
+  int32 limit = 2;
+  string cursor = 3;
+}
+message CommentPage {
+  repeated Comment comments = 1;
+  string next_cursor = 2;
+}

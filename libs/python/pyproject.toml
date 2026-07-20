@@ -1,0 +1,15 @@
+[project]
+name = "inama-libs"
+version = "0.0.0"
+description = "Shared conventions for Inama's Python services"
+requires-python = ">=3.12"
+# grpcio is required by inama_libs.identity. It's declared here so
+# `pip install -e ../../libs/python` pulls it in for auth/search.
+dependencies = ["grpcio>=1.68"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["inama_libs"]

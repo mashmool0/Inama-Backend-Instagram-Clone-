@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package inama.feed.v1;
+
+option go_package = "github.com/mashmool0/inama/proto/gen/feed;feedpb";
+
+// Feed returns hydrated posts, so it reuses the Post message from posts.proto
+// rather than redefining it — the feed IS a list of posts. This is an
+// intentional proto dependency. The viewing user comes from gRPC metadata.
+
+import "posts/posts.proto";
+
+service FeedService {
+  rpc GetFeed(GetFeedRequest) returns (PostPage);       // posts from followed users
+  rpc GetExplore(GetExploreRequest) returns (PostPage); // recent public posts
+}
+
+message GetFeedRequest {
+  int32 limit = 1;   // ~20 per scroll
+  string cursor = 2; // opaque; empty = newest
+}
+
+message GetExploreRequest {
+  int32 limit = 1;
+  string cursor = 2;
+}
+
+message PostPage {
+  repeated inama.posts.v1.Post posts = 1;
+  string next_cursor = 2; // empty = no more
+}

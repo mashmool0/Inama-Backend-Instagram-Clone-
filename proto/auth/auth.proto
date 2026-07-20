@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package inama.auth.v1;
+
+option go_package = "github.com/mashmool0/inama/proto/gen/auth;authpb";
+
+// Conventions (see proto/README.md):
+//   - IDs are UUID strings.
+//   - Timestamps use google.protobuf.Timestamp.
+//   - Caller identity travels in gRPC metadata (x-user-id), NOT in messages.
+//     Auth is the exception: pre-login RPCs have no authenticated caller yet.
+//   - Errors use gRPC status codes.
+//
+// Auth signs JWTs with a private key; the Gateway verifies them locally with
+// the public key. There is deliberately no VerifyToken RPC on the hot path.
+
+import "google/protobuf/timestamp.proto";
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc VerifyOTP(VerifyOTPRequest) returns (TokenPair);
+  rpc Login(LoginRequest) returns (TokenPair);
+  rpc RefreshToken(RefreshTokenRequest) returns (TokenPair);
+  rpc RequestPasswordReset(RequestPasswordResetRequest) returns (RequestPasswordResetResponse);
+  rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
+}
+
+// Issued on successful auth. access_token is short-lived; refresh_token is long-lived.
+message TokenPair {
+  string access_token = 1;
+  string refresh_token = 2;
+  int32 expires_in = 3; // access token lifetime, seconds
+}
+
+message RegisterRequest {
+  string phone = 1;
+  string password = 2;
+}
+
+// Registration does not log you in — an OTP is sent to the phone first.
+message RegisterResponse {
+  bool otp_sent = 1;
+}
+
+message VerifyOTPRequest {
+  string phone = 1;
+  string code = 2;
+}
+
+message LoginRequest {
+  string phone = 1; // login by phone for now; username login can be added later
+  string password = 2;
+}
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+message RequestPasswordResetRequest {
+  string email = 1;
+}
+
+message RequestPasswordResetResponse {
+  bool email_sent = 1;
+}
+
+message ResetPasswordRequest {
+  string reset_token = 1;
+  string new_password = 2;
+}
+
+message ResetPasswordResponse {
+  bool success = 1;
+}

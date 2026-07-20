@@ -1,0 +1,23 @@
+# What to generate from the protos, and where.
+# Uses buf's REMOTE plugins (run on buf's servers) so no local protoc-gen-*
+# installs are needed — only `buf` itself + internet.
+#
+# Output goes to proto/gen/<service>/ (source_relative), matching the
+# go_package option in each .proto. That directory is its own Go module.
+version: v2
+plugins:
+  # ----- Go -----
+  - remote: buf.build/protocolbuffers/go
+    out: proto/gen
+    opt: paths=source_relative
+  - remote: buf.build/grpc/go
+    out: proto/gen
+    opt: paths=source_relative
+
+  # ----- Python (for FastAPI: auth, search) -----
+  - remote: buf.build/protocolbuffers/python
+    out: proto/gen
+  - remote: buf.build/protocolbuffers/pyi
+    out: proto/gen
+  - remote: buf.build/grpc/python
+    out: proto/gen

@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package inama.user.v1;
+
+option go_package = "github.com/mashmool0/inama/proto/gen/user;userpb";
+
+// Conventions: UUID string IDs, google.protobuf.Timestamp, caller identity in
+// gRPC metadata (x-user-id). Where an RPC acts on "me" (UpdateProfile, Follow),
+// the actor comes from metadata; the target user is an explicit field.
+
+import "google/protobuf/timestamp.proto";
+
+service UserService {
+  rpc GetProfile(GetProfileRequest) returns (Profile);
+  rpc UpdateProfile(UpdateProfileRequest) returns (Profile);
+  rpc Follow(FollowRequest) returns (FollowResponse);
+  rpc Unfollow(UnfollowRequest) returns (UnfollowResponse);
+
+  // Feed's fanout worker depends on this — keep it fast and paginated.
+  rpc GetFollowers(GetFollowersRequest) returns (UserIdPage);
+  rpc GetFollowing(GetFollowingRequest) returns (UserIdPage);
+}
+
+message Profile {
+  string id = 1;
+  string username = 2;
+  string bio = 3;
+  string avatar_url = 4;
+  int64 follower_count = 5;
+  int64 following_count = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message GetProfileRequest {
+  string user_id = 1;
+}
+
+// Only set fields are updated. Actor = x-user-id from metadata.
+message UpdateProfileRequest {
+  optional string username = 1;
+  optional string bio = 2;
+  optional string avatar_url = 3;
+}
+
+message FollowRequest {
+  string target_user_id = 1; // follower = x-user-id from metadata
+}
+message FollowResponse { bool success = 1; }
+
+message UnfollowRequest {
+  string target_user_id = 1;
+}
+message UnfollowResponse { bool success = 1; }
+
+message GetFollowersRequest {
+  string user_id = 1;
+  int32 limit = 2;
+  string cursor = 3; // opaque; empty = start
+}
+
+message GetFollowingRequest {
+  string user_id = 1;
+  int32 limit = 2;
+  string cursor = 3;
+}
+
+// Just IDs — the fanout worker only needs follower IDs, not full profiles.
+message UserIdPage {
+  repeated string user_ids = 1;
+  string next_cursor = 2; // empty = no more
+}

@@ -92,11 +92,8 @@ log/
 
 
 # ── Protobuf generated code ──────────────────
-# keep .proto source, ignore generated output
-**/*.pb.go
-**/*_pb2.py
-**/*_pb2_grpc.py
-**/*_grpc.pb.go
+# Generated code IS committed, under proto/gen/ (single source of truth,
+# produced by `make gen`). So it is intentionally NOT ignored here.
 
 
 # ── Monitoring data ──────────────────────────

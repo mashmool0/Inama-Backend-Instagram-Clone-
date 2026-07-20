@@ -1,0 +1,257 @@
+# Inama Backend
+
+Backend mono-repository for Inama, an Instagram-style social platform. The system is organized as independently deployable services connected by a Go HTTP API Gateway, internal gRPC, RabbitMQ events, and PostgreSQL databases.
+
+## Current status
+
+This repository is in the foundation/Phase 0–early Phase 1 stage. The gateway, Auth service, User service, Notifications service, shared protobuf contracts, and local infrastructure are runnable. Posts and Feed currently expose health endpoints only, and Search currently exposes a health endpoint only; their planned domain behavior is documented but not implemented in the current source.
+
+## Prerequisites
+
+The recommended way to run the backend is Docker Compose:
+
+- Docker Engine and Docker Compose v2
+- Git
+
+For local development or code generation:
+
+- Go 1.23 or newer
+- Python 3.12 or newer for Auth and Search
+- `make`
+
+## Start the backend
+
+From this directory:
+
+```bash
+docker compose up --build
+```
+
+The first build can take a few minutes. The compose file starts the application services and PostgreSQL, Redis, RabbitMQ, Prometheus, and Grafana.
+
+To run in the background:
+
+```bash
+docker compose up --build -d
+docker compose ps
+```
+
+Stop the stack:
+
+```bash
+docker compose down
+```
+
+Add `-v` only when you intentionally want to remove the persisted PostgreSQL and generated auth-key volumes.
+
+### Start selected services
+
+```bash
+docker compose up --build gateway
+docker compose up --build user postgres rabbitmq
+```
+
+The services are not all connected with strict startup dependencies yet. A service may start before its dependency is ready and exit/restart while Compose brings up the stack.
+
+### Important port note
+
+Grafana uses host port `3000`, which is also the default frontend port. Run the backend stack by itself, or change the Grafana mapping in `docker-compose.yml` from `3000:3000` to `3001:3000` before running backend and frontend together. The frontend can alternatively use `FRONTEND_PORT=3001`.
+
+## Verify the running stack
+
+Gateway health:
+
+```bash
+curl -i http://localhost:8080/health
+```
+
+HTTP health endpoints exposed by services:
+
+```bash
+curl -i http://localhost:8082/health  # user
+curl -i http://localhost:8083/health  # posts scaffold
+curl -i http://localhost:8084/health  # feed scaffold
+curl -i http://localhost:8085/health  # notifications
+curl -i http://localhost:8086/health  # search scaffold
+```
+
+Auth is gRPC-only on host port `50051`; it does not currently expose an HTTP `/health` endpoint. User and Notifications also expose gRPC on `50052` and `50055` respectively, alongside their HTTP health/metrics ports. RabbitMQ management is at [http://localhost:15672](http://localhost:15672) with `guest` / `guest`; Prometheus is at [http://localhost:9090](http://localhost:9090); Grafana is at [http://localhost:3000](http://localhost:3000) when there is no frontend port conflict.
+
+Expected health responses have the form:
+
+```json
+{"status":"ok","service":"gateway"}
+```
+
+The health checks confirm process availability only. They do not prove that every domain operation is implemented.
+
+## Test the backend
+
+### Go services
+
+Run unit/package tests for each Go module:
+
+```bash
+(cd services/gateway && go test ./...)
+(cd services/user && go test ./...)
+(cd services/notifications && go test ./...)
+(cd services/posts && go test ./...)
+(cd services/feed && go test ./...)
+(cd proto/gen && go test ./...)
+```
+
+The User and Notifications integration tests require `INTEGRATION_DATABASE_URL`; without it, those tests skip. For example:
+
+```bash
+cd services/user
+INTEGRATION_DATABASE_URL='postgres://inama:inama@localhost:5432/user_db?sslmode=disable' go test ./...
+cd ../..
+```
+
+### Auth service
+
+The Auth test suite is Python/pytest-based and needs PostgreSQL. Install its development dependencies in a virtual environment:
+
+```bash
+cd services/auth
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest
+```
+
+The test fixture uses `TEST_PG_BASE` and defaults to `inama:inama@localhost:5432`; start PostgreSQL first. RabbitMQ tests use `RABBITMQ_URL` and skip when RabbitMQ is unavailable locally.
+
+The complete containerized Auth suite is defined by the Compose test profile:
+
+```bash
+docker compose --profile test run --rm auth-tests
+```
+
+### Contract checks
+
+Generated protobuf code is committed under `proto/gen/`. Run these checks after changing `.proto` files:
+
+```bash
+make lint
+make format
+make gen
+```
+
+`make gen` installs Buf through Go if it is missing, regenerates Go and Python stubs, and tidies the generated Go module.
+
+## How the backend works
+
+```text
+Frontend/browser
+      ↓ REST + JSON
+API Gateway :8080
+      ↓ JWT verification + rate limiting + routing
+Internal services over gRPC
+      ↘ RabbitMQ events for asynchronous work
+PostgreSQL per service + Redis + external search/push systems
+```
+
+The browser should call only the Gateway. The Gateway validates RS256 JWTs using the public key generated by Auth, injects the verified user identity as `x-user-id` gRPC metadata, applies Redis-backed rate limiting, and translates REST/JSON requests to generated gRPC clients.
+
+Synchronous calls use gRPC when the caller needs an immediate result. RabbitMQ is used for events such as registration, likes, comments, and follows, where consumers can process work asynchronously. Auth uses an outbox table and relay so database changes and published events are not silently separated.
+
+Services follow this internal layering rule:
+
+```text
+gRPC handler or queue consumer
+        ↓
+business service
+        ↓
+repository / database access
+```
+
+Handlers translate transport types and enforce request-level concerns; services contain business rules; repositories own database access. A service must not query another service's database directly.
+
+## Services
+
+| Service | Language | Ports | Role and current implementation |
+|---|---|---|---|
+| `gateway` | Go | `8080` | Public REST gateway, JWT verification, rate limiting, routing |
+| `auth` | Python gRPC | `50051` | Registration/login/refresh/username and RS256 token issuing; migrations and key generation run on startup |
+| `user` | Go | `8082`, `50052` | Profiles, follows, pagination, RabbitMQ profile sync, health and metrics |
+| `posts` | Go | `8083` | Health-only Phase 0 scaffold |
+| `feed` | Go | `8084` | Health-only Phase 0 scaffold |
+| `notifications` | Go | `8085`, `50055` | Notification persistence/read APIs, RabbitMQ consumer, health and metrics |
+| `search` | Python/FastAPI | `8086` | Health-only Phase 0 scaffold |
+
+Infrastructure services:
+
+| Component | Host port | Purpose |
+|---|---:|---|
+| PostgreSQL 16 | `5432` | Logical databases initialized by `infra/postgres/init.sql` |
+| Redis 7 | `6379` | Gateway rate-limit counters |
+| RabbitMQ management | `5672`, `15672` | Async event broker and management UI |
+| Prometheus | `9090` | Metrics collection |
+| Grafana | `3000` | Metrics dashboard; conflicts with the frontend default port |
+
+## Gateway API routes
+
+Public routes:
+
+```text
+POST /auth/register
+POST /auth/login
+POST /auth/refresh
+```
+
+Protected routes require `Authorization: Bearer <jwt>`:
+
+```text
+PATCH  /auth/me/username
+GET    /users/{id}
+GET    /users/{id}/{action}
+PATCH  /users/me
+POST   /users/{id}/follow
+DELETE /users/{id}/follow
+POST   /posts
+GET    /posts/{id}
+DELETE /posts/{id}
+POST   /posts/{id}/like
+DELETE /posts/{id}/like
+POST   /posts/{id}/comments
+GET    /posts/{id}/comments
+GET    /feed
+GET    /explore
+GET    /notifications
+POST   /notifications/read-all
+POST   /notifications/{id}/read
+GET    /search
+```
+
+Routes for planned Auth OTP/password reset behavior and the frontend's current `/profiles/...` paths are not currently registered in the Gateway. Treat those flows as integration work in progress.
+
+## Repository layout
+
+```text
+services/       # one directory/module per deployable service
+proto/          # protobuf contracts and generated Go/Python code
+libs/           # shared Go/Python config, identity, and logging helpers
+infra/          # PostgreSQL initialization and Prometheus configuration
+docs/           # architecture, service, database, communication, and roadmap docs
+C4 Model/       # architecture diagrams
+docker-compose.yml
+Makefile
+```
+
+Read [`docs/getting-started.md`](./docs/getting-started.md) for onboarding and [`CLAUDE.md`](./CLAUDE.md) for the repository's locked architecture decisions and development guardrails. The protobuf contracts are documented in [`proto/README.md`](./proto/README.md) and [`proto/EVENTS.md`](./proto/EVENTS.md).
+
+## Configuration and secrets
+
+Compose supplies development defaults for database credentials, service addresses, RabbitMQ, Redis, CORS, and JWT key paths. Auth generates an ephemeral RS256 keypair into the named `auth-keys` volume during startup; the Gateway reads the public key from that shared volume. Production deployments should replace generated keys and default credentials with secret-managed values.
+
+Do not commit private keys, passwords, tokens, or local `.env` files.
+
+## Troubleshooting
+
+- Gateway exits while starting: wait for Auth to generate the shared public key; its restart policy retries startup.
+- Auth exits on first boot: PostgreSQL may not be ready yet; Compose restarts it while migrations retry.
+- Port already allocated: check `3000` (Grafana/frontend), `8080`, `5432`, `5672`, and `6379`.
+- A health endpoint works but a feature does not: several services are intentionally scaffolds, and health is not a domain readiness check.
+- Frontend receives 404s: compare frontend API paths with the Gateway route table above; `/profiles` versus `/users` is a known mismatch in the current repositories.
+

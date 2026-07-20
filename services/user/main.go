@@ -62,7 +62,7 @@ func main() {
 	userRepo := repository.NewUserRepository(pool)
 	followRepo := repository.NewFollowRepository(pool)
 	profileSyncRepo := repository.NewProfileSyncRepository(pool)
-	publisher := userevents.NopPublisher{}
+	publisher := userevents.NewRabbitPublisher(broker, logger)
 	profileService := service.NewProfileService(userRepo, publisher)
 	followService := service.NewFollowService(pool, userRepo, followRepo, publisher, cfg.DefaultPageLimit, cfg.MaxPageLimit)
 	profileSyncProcessor := service.NewProfileSyncProcessor(pool, profileSyncRepo)

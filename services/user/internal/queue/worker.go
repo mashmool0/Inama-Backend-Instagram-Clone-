@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -20,8 +21,11 @@ type Config struct {
 type Broker struct {
 	conn      *amqp.Connection
 	channel   *amqp.Channel
+	publisher *amqp.Channel
+	confirms  <-chan amqp.Confirmation
 	exchange  string
 	queueName string
+	publishMu sync.Mutex
 }
 
 type deliveryProcessor interface {
@@ -75,7 +79,18 @@ func Connect(ctx context.Context, cfg Config) (*Broker, error) {
 			channel, channelErr := conn.Channel()
 			if channelErr == nil {
 				if topologyErr := declareTopology(channel, cfg); topologyErr == nil {
-					return &Broker{conn: conn, channel: channel, exchange: cfg.Exchange, queueName: cfg.QueueName}, nil
+					publisher, publisherErr := conn.Channel()
+					if publisherErr == nil {
+						if confirmErr := publisher.Confirm(false); confirmErr == nil {
+							confirms := publisher.NotifyPublish(make(chan amqp.Confirmation, 1))
+							return &Broker{conn: conn, channel: channel, publisher: publisher, confirms: confirms, exchange: cfg.Exchange, queueName: cfg.QueueName}, nil
+						} else {
+							lastErr = confirmErr
+						}
+						_ = publisher.Close()
+					} else {
+						lastErr = publisherErr
+					}
 				} else {
 					lastErr = topologyErr
 				}
@@ -94,6 +109,33 @@ func Connect(ctx context.Context, cfg Config) (*Broker, error) {
 		}
 	}
 	return nil, fmt.Errorf("connect rabbitmq: %w", lastErr)
+}
+
+func (b *Broker) Publish(ctx context.Context, routingKey string, body []byte) error {
+	b.publishMu.Lock()
+	defer b.publishMu.Unlock()
+
+	if err := b.publisher.PublishWithContext(ctx, b.exchange, routingKey, false, false, amqp.Publishing{
+		ContentType:  "application/json",
+		DeliveryMode: amqp.Persistent,
+		Timestamp:    time.Now().UTC(),
+		Body:         body,
+	}); err != nil {
+		return fmt.Errorf("publish %s: %w", routingKey, err)
+	}
+
+	select {
+	case confirmation, ok := <-b.confirms:
+		if !ok {
+			return fmt.Errorf("publish %s: confirmation channel closed", routingKey)
+		}
+		if !confirmation.Ack {
+			return fmt.Errorf("publish %s: broker rejected delivery", routingKey)
+		}
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("publish %s: %w", routingKey, ctx.Err())
+	}
 }
 
 func declareTopology(channel *amqp.Channel, cfg Config) error {
@@ -118,6 +160,9 @@ func (b *Broker) Close() error {
 	}
 	if b.channel != nil {
 		_ = b.channel.Close()
+	}
+	if b.publisher != nil {
+		_ = b.publisher.Close()
 	}
 	if b.conn != nil {
 		return b.conn.Close()

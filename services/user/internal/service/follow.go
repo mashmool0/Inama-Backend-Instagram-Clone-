@@ -82,12 +82,10 @@ func (s *FollowManager) Follow(ctx context.Context, actorID, targetUserID string
 	}
 
 	if created {
-		if err := s.publisher.UserFollowed(ctx, events.UserFollowedPayload{
+		_ = s.publisher.UserFollowed(ctx, events.UserFollowedPayload{
 			FollowerID: actorID,
 			FolloweeID: targetUserID,
-		}); err != nil {
-			return false, err
-		}
+		})
 	}
 
 	return created, nil

@@ -3,6 +3,7 @@ module github.com/mashmool0/inama/services/user
 go 1.25.0
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/mashmool0/inama/libs v0.0.0
 	github.com/mashmool0/inama/proto/gen v0.0.0

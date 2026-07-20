@@ -95,13 +95,11 @@ func (s *ProfileManager) UpdateProfile(ctx context.Context, actorID string, inpu
 	}
 
 	if before.AvatarURL != profile.AvatarURL {
-		if err := s.publisher.UserUpdated(ctx, events.UserUpdatedPayload{
+		_ = s.publisher.UserUpdated(ctx, events.UserUpdatedPayload{
 			UserID:    profile.ID,
 			Username:  profile.Username,
 			AvatarURL: profile.AvatarURL,
-		}); err != nil {
-			return model.Profile{}, err
-		}
+		})
 	}
 
 	return profile, nil

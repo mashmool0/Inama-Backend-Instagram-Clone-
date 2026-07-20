@@ -17,6 +17,12 @@ def main() -> None:
     keys_dir = Path("keys")
     keys_dir.mkdir(exist_ok=True)
 
+    private_path = keys_dir / "jwt_private.pem"
+    public_path = keys_dir / "jwt_public.pem"
+    if private_path.exists() and public_path.exists():
+        print("reusing existing keys/jwt_private.pem and keys/jwt_public.pem")
+        return
+
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
     private_pem = private_key.private_bytes(
@@ -29,8 +35,8 @@ def main() -> None:
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
 
-    (keys_dir / "jwt_private.pem").write_bytes(private_pem)
-    (keys_dir / "jwt_public.pem").write_bytes(public_pem)
+    private_path.write_bytes(private_pem)
+    public_path.write_bytes(public_pem)
     print("wrote keys/jwt_private.pem and keys/jwt_public.pem")
 
 

@@ -8,10 +8,10 @@ import (
 	userpb "github.com/mashmool0/inama/proto/gen/user"
 	"github.com/mashmool0/inama/services/user/internal/model"
 	"github.com/mashmool0/inama/services/user/internal/service"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Server struct {
@@ -30,6 +30,15 @@ func Register(registrar grpc.ServiceRegistrar, profiles service.ProfileService, 
 
 func (s *Server) GetProfile(ctx context.Context, req *userpb.GetProfileRequest) (*userpb.Profile, error) {
 	profile, err := s.profiles.GetProfile(ctx, req.GetUserId())
+	if err != nil {
+		return nil, translateError(err)
+	}
+
+	return toProtoProfile(profile), nil
+}
+
+func (s *Server) GetProfileByUsername(ctx context.Context, req *userpb.GetProfileByUsernameRequest) (*userpb.Profile, error) {
+	profile, err := s.profiles.GetProfileByUsername(ctx, req.GetUsername())
 	if err != nil {
 		return nil, translateError(err)
 	}

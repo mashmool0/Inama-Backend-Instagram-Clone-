@@ -11,12 +11,18 @@ User service can create a profile.
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import re
+import uuid
+
+from sqlalchemy.exc import IntegrityError
 
 from app.config import Settings
 from app.errors import (
     EmailAlreadyRegistered,
     InvalidCredentials,
     InvalidToken,
+    InvalidUsername,
+    UserNotFound,
     UsernameAlreadyTaken,
 )
 from app.repositories.outbox_repo import OutboxRepository
@@ -27,6 +33,8 @@ from app.services.password import PasswordService
 from app.services.tokens import generate_token, hash_token
 
 USER_REGISTERED = "user.registered"
+USER_USERNAME_UPDATED = "user.username_updated"
+USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9._]+$")
 
 
 @dataclass
@@ -96,6 +104,39 @@ class AuthService:
         pair = await self._issue_tokens(str(stored.user_id))
         await self._session.commit()
         return pair
+
+    async def update_username(self, user_id: str, username: str) -> str:
+        username = username.strip()
+        if not 3 <= len(username) <= 50 or USERNAME_PATTERN.fullmatch(username) is None:
+            raise InvalidUsername()
+
+        try:
+            parsed_user_id = uuid.UUID(user_id)
+        except (TypeError, ValueError):
+            raise UserNotFound() from None
+
+        user = await self._users.get_by_id(parsed_user_id)
+        if user is None:
+            raise UserNotFound()
+        if user.username == username:
+            return username
+
+        existing = await self._users.get_by_username(username)
+        if existing is not None and existing.id != user.id:
+            raise UsernameAlreadyTaken()
+
+        try:
+            await self._users.update_username(user, username)
+            await self._outbox.add(
+                USER_USERNAME_UPDATED,
+                {"user_id": str(user.id), "username": username},
+            )
+            await self._session.commit()
+        except IntegrityError:
+            await self._session.rollback()
+            raise UsernameAlreadyTaken() from None
+
+        return username
 
     async def _issue_tokens(self, user_id: str) -> TokenPair:
         """Issue a short-lived access JWT + a stored (hashed) opaque refresh token."""

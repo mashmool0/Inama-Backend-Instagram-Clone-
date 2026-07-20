@@ -17,6 +17,7 @@ service AuthService {
   rpc Register(RegisterRequest) returns (TokenPair);
   rpc Login(LoginRequest) returns (TokenPair);
   rpc RefreshToken(RefreshTokenRequest) returns (TokenPair);
+  rpc UpdateUsername(UpdateUsernameRequest) returns (UpdateUsernameResponse);
 }
 
 // Issued on successful auth. access_token is short-lived; refresh_token is long-lived.
@@ -39,4 +40,13 @@ message LoginRequest {
 
 message RefreshTokenRequest {
   string refresh_token = 1;
+}
+
+// Auth owns username uniqueness. Caller identity is read from x-user-id metadata.
+message UpdateUsernameRequest {
+  string username = 1;
+}
+
+message UpdateUsernameResponse {
+  string username = 1;
 }

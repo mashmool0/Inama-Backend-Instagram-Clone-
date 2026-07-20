@@ -12,6 +12,7 @@ import "google/protobuf/timestamp.proto";
 
 service UserService {
   rpc GetProfile(GetProfileRequest) returns (Profile);
+  rpc GetProfileByUsername(GetProfileByUsernameRequest) returns (Profile);
   rpc UpdateProfile(UpdateProfileRequest) returns (Profile);
   rpc Follow(FollowRequest) returns (FollowResponse);
   rpc Unfollow(UnfollowRequest) returns (UnfollowResponse);
@@ -35,7 +36,12 @@ message GetProfileRequest {
   string user_id = 1;
 }
 
-// Only set fields are updated. Actor = x-user-id from metadata.
+message GetProfileByUsernameRequest {
+  string username = 1;
+}
+
+// Only bio and avatar_url are updated here. Username is retained for wire
+// compatibility but rejected; Auth is the authoritative username owner.
 message UpdateProfileRequest {
   optional string username = 1;
   optional string bio = 2;

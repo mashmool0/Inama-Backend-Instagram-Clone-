@@ -17,6 +17,14 @@ class UsernameAlreadyTaken(AuthError):
     pass
 
 
+class InvalidUsername(AuthError):
+    pass
+
+
+class UserNotFound(AuthError):
+    pass
+
+
 class InvalidCredentials(AuthError):
     pass
 

@@ -17,6 +17,8 @@ from app.errors import (
     EmailAlreadyRegistered,
     InvalidCredentials,
     InvalidToken,
+    InvalidUsername,
+    UserNotFound,
     UsernameAlreadyTaken,
 )
 from app.repositories.outbox_repo import OutboxRepository
@@ -31,6 +33,8 @@ _ERROR_MAP = {
     UsernameAlreadyTaken: (grpc.StatusCode.ALREADY_EXISTS, "username already taken"),
     InvalidCredentials: (grpc.StatusCode.UNAUTHENTICATED, "invalid credentials"),
     InvalidToken: (grpc.StatusCode.UNAUTHENTICATED, "invalid or expired refresh token"),
+    InvalidUsername: (grpc.StatusCode.INVALID_ARGUMENT, "invalid username"),
+    UserNotFound: (grpc.StatusCode.NOT_FOUND, "user not found"),
 }
 
 
@@ -45,6 +49,14 @@ def _to_proto(pair: TokenPair) -> "auth_pb2.TokenPair":
         refresh_token=pair.refresh_token,
         expires_in=pair.expires_in,
     )
+
+
+async def _require_user_id(context: grpc.aio.ServicerContext) -> str:
+    for item in context.invocation_metadata():
+        if item.key.lower() == "x-user-id" and item.value:
+            return item.value
+    await context.abort(grpc.StatusCode.UNAUTHENTICATED, "missing caller identity")
+    raise RuntimeError("unreachable")
 
 
 class AuthHandler(auth_pb2_grpc.AuthServiceServicer):
@@ -94,3 +106,14 @@ class AuthHandler(auth_pb2_grpc.AuthServiceServicer):
             except AuthError as err:
                 await _abort(context, err)
         return _to_proto(pair)
+
+    async def UpdateUsername(self, request, context):
+        user_id = await _require_user_id(context)
+        async with SessionLocal() as session:
+            try:
+                username = await self._service(session).update_username(
+                    user_id, request.username
+                )
+            except AuthError as err:
+                await _abort(context, err)
+        return auth_pb2.UpdateUsernameResponse(username=username)

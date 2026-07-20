@@ -14,6 +14,8 @@ from app.errors import (
     EmailAlreadyRegistered,
     InvalidCredentials,
     InvalidToken,
+    InvalidUsername,
+    UserNotFound,
     UsernameAlreadyTaken,
 )
 from app.models import OutboxEvent
@@ -51,6 +53,11 @@ async def _login(identifier, password):
 async def _refresh(token):
     async with SessionLocal() as s:
         return await _service(s).refresh(token)
+
+
+async def _update_username(user_id, username):
+    async with SessionLocal() as s:
+        return await _service(s).update_username(user_id, username)
 
 
 # ---------- register ----------
@@ -119,3 +126,42 @@ async def test_refresh_rotates_and_revokes_old_token():
 async def test_refresh_invalid_token_rejected():
     with pytest.raises(InvalidToken):
         await _refresh("not-a-real-token")
+
+
+# ---------- username update ----------
+
+async def test_update_username_changes_auth_user_and_writes_outbox_event():
+    await _register("ali@x.com", "ali", "pw12345")
+    async with SessionLocal() as s:
+        user = await UserRepository(s).get_by_email("ali@x.com")
+        user_id = str(user.id)
+
+    assert await _update_username(user_id, "ali.new") == "ali.new"
+
+    async with SessionLocal() as s:
+        user = await UserRepository(s).get_by_id(user.id)
+        events = (
+            await s.execute(
+                select(OutboxEvent).where(
+                    OutboxEvent.event_type == "user.username_updated"
+                )
+            )
+        ).scalars().all()
+        assert user.username == "ali.new"
+        assert len(events) == 1
+        assert events[0].payload == {"user_id": user_id, "username": "ali.new"}
+
+
+async def test_update_username_rejects_duplicate_and_invalid_values():
+    await _register("ali@x.com", "ali", "pw12345")
+    await _register("sara@x.com", "sara", "pw12345")
+    async with SessionLocal() as s:
+        user = await UserRepository(s).get_by_email("ali@x.com")
+        user_id = str(user.id)
+
+    with pytest.raises(UsernameAlreadyTaken):
+        await _update_username(user_id, "sara")
+    with pytest.raises(InvalidUsername):
+        await _update_username(user_id, "bad username")
+    with pytest.raises(UserNotFound):
+        await _update_username("not-a-uuid", "valid_name")

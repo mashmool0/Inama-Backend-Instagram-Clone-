@@ -33,6 +33,12 @@ class GetProfileRequest(_message.Message):
     user_id: str
     def __init__(self, user_id: _Optional[str] = ...) -> None: ...
 
+class GetProfileByUsernameRequest(_message.Message):
+    __slots__ = ("username",)
+    USERNAME_FIELD_NUMBER: _ClassVar[int]
+    username: str
+    def __init__(self, username: _Optional[str] = ...) -> None: ...
+
 class UpdateProfileRequest(_message.Message):
     __slots__ = ("username", "bio", "avatar_url")
     USERNAME_FIELD_NUMBER: _ClassVar[int]

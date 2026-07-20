@@ -58,3 +58,22 @@ async def test_wrong_password_maps_to_unauthenticated(stub):
     with pytest.raises(grpc.aio.AioRpcError) as err:
         await stub.Login(auth_pb2.LoginRequest(identifier="w@x.com", password="wrong"))
     assert err.value.code() == grpc.StatusCode.UNAUTHENTICATED
+
+
+async def test_update_username_requires_identity_and_returns_new_username(stub):
+    reg = await stub.Register(
+        auth_pb2.RegisterRequest(email="rename@x.com", username="before", password="pw")
+    )
+
+    with pytest.raises(grpc.aio.AioRpcError) as err:
+        await stub.UpdateUsername(auth_pb2.UpdateUsernameRequest(username="after"))
+    assert err.value.code() == grpc.StatusCode.UNAUTHENTICATED
+
+    # Decode the test JWT only to obtain the authoritative subject for metadata.
+    settings = load()
+    user_id = JWTService(settings).verify_access(reg.access_token)["sub"]
+    response = await stub.UpdateUsername(
+        auth_pb2.UpdateUsernameRequest(username="after"),
+        metadata=(("x-user-id", user_id),),
+    )
+    assert response.username == "after"

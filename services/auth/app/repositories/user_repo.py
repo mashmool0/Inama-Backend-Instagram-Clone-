@@ -36,3 +36,8 @@ class UserRepository:
 
     async def get_by_id(self, user_id: uuid.UUID) -> User | None:
         return await self._session.get(User, user_id)
+
+    async def update_username(self, user: User, username: str) -> User:
+        user.username = username
+        await self._session.flush()
+        return user

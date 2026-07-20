@@ -60,15 +60,10 @@ func (r *UserRepository) ExistsByID(ctx context.Context, userID string) (bool, e
 }
 
 func (r *UserRepository) UpdateProfileFields(ctx context.Context, userID string, input model.UpdateProfileInput) (model.Profile, error) {
-	sets := make([]string, 0, 4)
-	args := make([]any, 0, 5)
+	sets := make([]string, 0, 3)
+	args := make([]any, 0, 4)
 	argPos := 1
 
-	if input.Username != nil {
-		sets = append(sets, fmt.Sprintf("username = $%d", argPos))
-		args = append(args, *input.Username)
-		argPos++
-	}
 	if input.Bio != nil {
 		sets = append(sets, fmt.Sprintf("bio = $%d", argPos))
 		args = append(args, *input.Bio)

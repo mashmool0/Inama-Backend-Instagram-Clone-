@@ -37,3 +37,15 @@ class RefreshTokenRequest(_message.Message):
     REFRESH_TOKEN_FIELD_NUMBER: _ClassVar[int]
     refresh_token: str
     def __init__(self, refresh_token: _Optional[str] = ...) -> None: ...
+
+class UpdateUsernameRequest(_message.Message):
+    __slots__ = ("username",)
+    USERNAME_FIELD_NUMBER: _ClassVar[int]
+    username: str
+    def __init__(self, username: _Optional[str] = ...) -> None: ...
+
+class UpdateUsernameResponse(_message.Message):
+    __slots__ = ("username",)
+    USERNAME_FIELD_NUMBER: _ClassVar[int]
+    username: str
+    def __init__(self, username: _Optional[str] = ...) -> None: ...

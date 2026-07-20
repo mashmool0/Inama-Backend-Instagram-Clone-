@@ -13,11 +13,13 @@ import (
 
 type ProfileService interface {
 	GetProfile(ctx context.Context, userID string) (model.Profile, error)
+	GetProfileByUsername(ctx context.Context, username string) (model.Profile, error)
 	UpdateProfile(ctx context.Context, actorID string, input model.UpdateProfileInput) (model.Profile, error)
 }
 
 type userReaderWriter interface {
 	GetByID(ctx context.Context, userID string) (model.Profile, error)
+	GetByUsername(ctx context.Context, username string) (model.Profile, error)
 	UpdateProfileFields(ctx context.Context, userID string, input model.UpdateProfileInput) (model.Profile, error)
 }
 
@@ -46,9 +48,28 @@ func (s *ProfileManager) GetProfile(ctx context.Context, userID string) (model.P
 	return profile, nil
 }
 
+func (s *ProfileManager) GetProfileByUsername(ctx context.Context, username string) (model.Profile, error) {
+	if username == "" {
+		return model.Profile{}, NewInvalidArgument("username is required")
+	}
+
+	profile, err := s.users.GetByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.Profile{}, ErrNotFound
+		}
+		return model.Profile{}, err
+	}
+
+	return profile, nil
+}
+
 func (s *ProfileManager) UpdateProfile(ctx context.Context, actorID string, input model.UpdateProfileInput) (model.Profile, error) {
 	if actorID == "" {
 		return model.Profile{}, ErrUnauthenticated
+	}
+	if input.Username != nil {
+		return model.Profile{}, NewInvalidArgument("username must be updated through auth")
 	}
 
 	before, err := s.users.GetByID(ctx, actorID)
@@ -73,7 +94,7 @@ func (s *ProfileManager) UpdateProfile(ctx context.Context, actorID string, inpu
 		return model.Profile{}, err
 	}
 
-	if before.Username != profile.Username || before.AvatarURL != profile.AvatarURL {
+	if before.AvatarURL != profile.AvatarURL {
 		if err := s.publisher.UserUpdated(ctx, events.UserUpdatedPayload{
 			UserID:    profile.ID,
 			Username:  profile.Username,

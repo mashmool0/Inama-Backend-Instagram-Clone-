@@ -27,6 +27,10 @@ return count
 // rather than take the whole gateway down.
 func rateLimit(rdb *redis.Client, limit int, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if rdb == nil || limit <= 0 {
+			next.ServeHTTP(w, r)
+			return
+		}
 		ip := clientIP(r)
 		key := "rl:" + ip + ":" + strconv.FormatInt(time.Now().Unix(), 10)
 

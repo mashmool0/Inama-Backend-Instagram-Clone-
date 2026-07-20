@@ -31,14 +31,14 @@ func registerRoutes(mux *http.ServeMux, c clients, rdb *redis.Client, limit int,
 	mux.Handle("POST /auth/register", public(authRegisterHandler(c.auth)))
 	mux.Handle("POST /auth/login", public(authLoginHandler(c.auth)))
 	mux.Handle("POST /auth/refresh", public(authRefreshHandler(c.auth)))
+	mux.Handle("PATCH /auth/me/username", protected(authUpdateUsernameHandler(c.auth)))
 
 	// ---- User (protected) ----
 	mux.Handle("GET /users/{id}", protected(getUserHandler(c.user)))
+	mux.Handle("GET /users/{id}/{action}", protected(getUserSubresourceHandler(c.user)))
 	mux.Handle("PATCH /users/me", protected(updateUserHandler(c.user)))
 	mux.Handle("POST /users/{id}/follow", protected(followHandler(c.user)))
 	mux.Handle("DELETE /users/{id}/follow", protected(unfollowHandler(c.user)))
-	mux.Handle("GET /users/{id}/followers", protected(getFollowersHandler(c.user)))
-	mux.Handle("GET /users/{id}/following", protected(getFollowingHandler(c.user)))
 
 	// ---- Posts (protected) ----
 	mux.Handle("POST /posts", protected(createPostHandler(c.posts)))

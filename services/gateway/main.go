@@ -11,6 +11,7 @@ import (
 	"crypto/rsa"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -73,9 +74,10 @@ func main() {
 
 	mux := http.NewServeMux()
 	registerRoutes(mux, c, rdb, rateLimit, pubKey)
+	handler := cors(strings.Split(config.Get("CORS_ALLOWED_ORIGINS", "http://localhost:3000"), ","), mux)
 
 	log.Info("gateway listening", "port", port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
+	if err := http.ListenAndServe(":"+port, handler); err != nil {
 		log.Error("server exited", "err", err)
 		os.Exit(1)
 	}

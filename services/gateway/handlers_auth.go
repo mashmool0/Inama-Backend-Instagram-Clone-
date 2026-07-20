@@ -53,3 +53,18 @@ func authRefreshHandler(client authpb.AuthServiceClient) http.Handler {
 		writeJSON(w, http.StatusOK, pair)
 	})
 }
+
+func authUpdateUsernameHandler(client authpb.AuthServiceClient) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req authpb.UpdateUsernameRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		response, err := client.UpdateUsername(r.Context(), &req)
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, response)
+	})
+}

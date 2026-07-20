@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,6 +14,51 @@ import (
 	"github.com/mashmool0/inama/services/user/internal/repository"
 	"github.com/mashmool0/inama/services/user/internal/schema"
 )
+
+func TestProfileSyncIntegrationIsIdempotentAndUpdatesUsername(t *testing.T) {
+	pool := integrationPool(t)
+	resetDatabase(t, pool)
+
+	processor := NewProfileSyncProcessor(pool, repository.NewProfileSyncRepository(pool))
+	userID := "55555555-5555-5555-5555-555555555555"
+	registered := []byte(fmt.Sprintf(`{
+  "event_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "event_type":"user.registered",
+  "occurred_at":"2026-07-20T00:00:00Z",
+  "data":{"user_id":%q,"email":"sync@example.com","username":"before"}
+}`, userID))
+	if err := processor.Process(context.Background(), registered); err != nil {
+		t.Fatalf("Process(user.registered) error = %v", err)
+	}
+	if err := processor.Process(context.Background(), registered); err != nil {
+		t.Fatalf("Process(duplicate user.registered) error = %v", err)
+	}
+
+	var profileCount int
+	if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM users WHERE id = $1`, userID).Scan(&profileCount); err != nil {
+		t.Fatalf("count profiles error = %v", err)
+	}
+	if profileCount != 1 {
+		t.Fatalf("profile count = %d, want 1", profileCount)
+	}
+
+	usernameUpdated := []byte(fmt.Sprintf(`{
+  "event_id":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  "event_type":"user.username_updated",
+  "occurred_at":"2026-07-20T00:00:01Z",
+  "data":{"user_id":%q,"username":"after"}
+}`, userID))
+	if err := processor.Process(context.Background(), usernameUpdated); err != nil {
+		t.Fatalf("Process(user.username_updated) error = %v", err)
+	}
+	profile, err := repository.NewUserRepository(pool).GetByID(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("GetByID() error = %v", err)
+	}
+	if profile.Username != "after" {
+		t.Fatalf("username = %q, want after", profile.Username)
+	}
+}
 
 const integrationDatabaseEnv = "INTEGRATION_DATABASE_URL"
 
@@ -163,7 +209,7 @@ func integrationPool(t *testing.T) *pgxpool.Pool {
 func resetDatabase(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 
-	if _, err := pool.Exec(context.Background(), `TRUNCATE TABLE follows, users`); err != nil {
+	if _, err := pool.Exec(context.Background(), `TRUNCATE TABLE processed_events, follows, users`); err != nil {
 		t.Fatalf("TRUNCATE error = %v", err)
 	}
 }

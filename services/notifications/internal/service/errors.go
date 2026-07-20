@@ -1,0 +1,22 @@
+package service
+
+import "errors"
+
+var (
+	ErrUnauthenticated = errors.New("unauthenticated")
+	ErrNotFound        = errors.New("not found")
+	ErrInvalidCursor   = errors.New("invalid cursor")
+	ErrRejectMessage   = errors.New("reject message")
+)
+
+type InvalidArgumentError struct {
+	message string
+}
+
+func (e InvalidArgumentError) Error() string {
+	return e.message
+}
+
+func NewInvalidArgument(message string) error {
+	return InvalidArgumentError{message: message}
+}

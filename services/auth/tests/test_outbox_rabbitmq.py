@@ -47,7 +47,11 @@ async def test_relay_publishes_outbox_event_and_marks_it_published(rabbit_channe
     async with SessionLocal() as s:
         await OutboxRepository(s).add(
             "user.registered",
-            {"user_id": "u1", "email": "r@x.com", "username": "ru"},
+            {
+                "user_id": "11111111-1111-1111-1111-111111111111",
+                "email": "r@x.com",
+                "username": "relay_user",
+            },
         )
         await s.commit()
 
@@ -65,7 +69,7 @@ async def test_relay_publishes_outbox_event_and_marks_it_published(rabbit_channe
     assert body["event_type"] == "user.registered"
     assert body["occurred_at"]
     assert body["data"]["email"] == "r@x.com"
-    assert body["data"]["username"] == "ru"
+    assert body["data"]["username"] == "relay_user"
 
     # 4) the outbox row is now marked published (won't be sent again)
     async with SessionLocal() as s:

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -35,6 +36,40 @@ func (p *ProfileSyncProcessor) Process(ctx context.Context, body []byte) error {
 	if envelope.EventID == "" || envelope.EventType == "" {
 		return fmt.Errorf("%w: missing event metadata", ErrRejectMessage)
 	}
+	if _, err := uuid.Parse(envelope.EventID); err != nil {
+		return fmt.Errorf("%w: invalid event id", ErrRejectMessage)
+	}
+
+	var registered *events.UserRegisteredPayload
+	var usernameUpdated *events.UsernameUpdatedPayload
+	switch envelope.EventType {
+	case events.EventTypeUserRegistered:
+		var payload events.UserRegisteredPayload
+		if err := decodeProfileSyncPayload(envelope.Data, &payload); err != nil {
+			return err
+		}
+		if payload.UserID == "" || payload.Username == "" {
+			return fmt.Errorf("%w: missing registration fields", ErrRejectMessage)
+		}
+		if _, err := uuid.Parse(payload.UserID); err != nil {
+			return fmt.Errorf("%w: invalid registration user id", ErrRejectMessage)
+		}
+		registered = &payload
+	case events.EventTypeUsernameUpdated:
+		var payload events.UsernameUpdatedPayload
+		if err := decodeProfileSyncPayload(envelope.Data, &payload); err != nil {
+			return err
+		}
+		if payload.UserID == "" || payload.Username == "" {
+			return fmt.Errorf("%w: missing username fields", ErrRejectMessage)
+		}
+		if _, err := uuid.Parse(payload.UserID); err != nil {
+			return fmt.Errorf("%w: invalid username user id", ErrRejectMessage)
+		}
+		usernameUpdated = &payload
+	default:
+		return fmt.Errorf("%w: unsupported event type %s", ErrRejectMessage, envelope.EventType)
+	}
 
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
@@ -50,31 +85,14 @@ func (p *ProfileSyncProcessor) Process(ctx context.Context, body []byte) error {
 		return tx.Commit(ctx)
 	}
 
-	switch envelope.EventType {
-	case events.EventTypeUserRegistered:
-		var payload events.UserRegisteredPayload
-		if err := decodeProfileSyncPayload(envelope.Data, &payload); err != nil {
+	if registered != nil {
+		if err := p.store.CreateProfile(ctx, tx, registered.UserID, registered.Username); err != nil {
 			return err
 		}
-		if payload.UserID == "" || payload.Username == "" {
-			return fmt.Errorf("%w: missing registration fields", ErrRejectMessage)
-		}
-		if err := p.store.CreateProfile(ctx, tx, payload.UserID, payload.Username); err != nil {
+	} else {
+		if err := p.store.UpdateUsername(ctx, tx, usernameUpdated.UserID, usernameUpdated.Username); err != nil {
 			return err
 		}
-	case events.EventTypeUsernameUpdated:
-		var payload events.UsernameUpdatedPayload
-		if err := decodeProfileSyncPayload(envelope.Data, &payload); err != nil {
-			return err
-		}
-		if payload.UserID == "" || payload.Username == "" {
-			return fmt.Errorf("%w: missing username fields", ErrRejectMessage)
-		}
-		if err := p.store.UpdateUsername(ctx, tx, payload.UserID, payload.Username); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("%w: unsupported event type %s", ErrRejectMessage, envelope.EventType)
 	}
 
 	return tx.Commit(ctx)

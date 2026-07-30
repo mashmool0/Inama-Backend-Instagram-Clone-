@@ -1,13 +1,13 @@
 # Inama — full stack on one shared network.
 #
-# Run EVERYTHING:        docker compose up --build
+# Run CORE:              docker compose up --build
+# Run optional services: docker compose --profile unfinished --profile observability up --build
 # Run ONE service:       docker compose up --build gateway
 # Run a service + infra:  docker compose up --build auth postgres redis
 # Check a service:       curl localhost:8080/health   (gateway)
 #
-# Services are intentionally NOT wired with depends_on yet, so any one of them
-# can run alone for quick local testing. Add depends_on per service once it
-# actually talks to Postgres/Redis/the broker.
+# Runtime services use health-aware dependencies and restart policies so a
+# Docker Desktop restart brings the complete dependency chain back reliably.
 
 networks:
   inama-net:
@@ -40,13 +40,17 @@ services:
       SEARCH_ADDR: "search:50051"
     volumes:
       - auth-keys:/keys:ro   # read-only; auth is the only writer
-    # depends_on only waits for auth to START, not for it to have written the
-    # shared key. restart makes the boot race non-fatal: if the gateway gives up
-    # waiting for the key, it comes back and finds it on the next try.
     restart: unless-stopped
     depends_on:
-      - auth
-      - redis
+      auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   auth:
     build:
@@ -62,11 +66,16 @@ services:
       JWT_PUBLIC_KEY_PATH: "/app/keys/jwt_public.pem"
     volumes:
       - auth-keys:/app/keys   # generate_keys.py writes here on startup
-    # Postgres may not accept connections the instant auth boots; restart lets
-    # auth retry the migration step instead of dying on a cold start.
     restart: unless-stopped
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 50051), 2).close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
   # Relay: reads the auth_db outbox table and publishes events to RabbitMQ.
   auth-outbox-relay:
@@ -78,9 +87,12 @@ services:
     environment:
       DATABASE_URL: "postgresql+psycopg://inama:inama@postgres:5432/auth_db"
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+    restart: unless-stopped
     depends_on:
-      - postgres
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   # One-off test runner. Not started by `docker compose up` (test profile).
   # Run the full Auth suite in a container against postgres + rabbitmq:
@@ -128,6 +140,7 @@ services:
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
       RABBITMQ_EXCHANGE: "inama.events"
       RABBITMQ_QUEUE: "user.profile-sync.q"
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,6 +153,7 @@ services:
       retries: 10
 
   posts:
+    profiles: ["unfinished"]
     build: ./services/posts
     ports: ["8083:8080"]
     networks: [inama-net]
@@ -147,6 +161,7 @@ services:
       PORT: "8080"
 
   feed:
+    profiles: ["unfinished"]
     build: ./services/feed
     ports: ["8084:8080"]
     networks: [inama-net]
@@ -172,6 +187,7 @@ services:
       RABBITMQ_EXCHANGE: "inama.events"
       RABBITMQ_QUEUE: "notif.q"
       RABBITMQ_ROUTING_KEYS: "post.liked,comment.created,user.followed"
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -184,6 +200,7 @@ services:
       retries: 10
 
   search:
+    profiles: ["unfinished"]
     build: ./services/search
     ports: ["8086:8000"]
     networks: [inama-net]
@@ -200,6 +217,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U inama -d postgres"]
       interval: 5s
@@ -210,6 +228,12 @@ services:
     image: redis:7-alpine
     ports: ["6379:6379"]
     networks: [inama-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   # The system's single message broker. Management UI at http://localhost:15672
   # (guest/guest). All services that need async messaging connect to this one.
@@ -219,6 +243,7 @@ services:
       - "5672:5672"     # AMQP (services connect here)
       - "15672:15672"   # management web UI
     networks: [inama-net]
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
@@ -226,6 +251,7 @@ services:
       retries: 15
 
   prometheus:
+    profiles: ["observability"]
     image: prom/prometheus:latest
     ports: ["9090:9090"]
     networks: [inama-net]
@@ -233,6 +259,7 @@ services:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
 
   grafana:
+    profiles: ["observability"]
     image: grafana/grafana:latest
     ports: ["3000:3000"]
     networks: [inama-net]
